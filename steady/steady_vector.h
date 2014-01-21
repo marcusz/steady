@@ -11,6 +11,25 @@
 
 #include "cstddef"
 
+
+template <class T>
+struct array {
+};
+
+
+
+/**
+Persistent
+Templetized
+UT
+Ranges, not iterators
+Strong exception safety
+Thread safe
+
+Hash-consing for global deduplication
+*/
+
+
 template <class T>
 class steady_vector {
 	public: steady_vector();
