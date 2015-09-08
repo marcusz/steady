@@ -30,6 +30,56 @@ Thread safe
 Hash-consing for global deduplication
 */
 
+static const int kBranchingFactor = 4;
+
+
+////////////////////////////////////////////		Leaf
+
+
+
+//	1 -> kBranchingFactor values.
+template <class T>
+struct Leaf {
+	std::vector<T> _values;
+};
+
+
+////////////////////////////////////////////		INode
+
+
+//	An INode points to up to 32 other iNodes alternatively 32 leaf nodes.
+template <class T>
+struct INode {
+	INode();
+
+	int32_t _rc;
+
+	union {
+		INode* _inodes[kBranchingFactor];
+		Leaf<T>* _leafs[kBranchingFactor];
+	} _children;
+};
+
+
+
+////////////////////////////////////////////		INode
+
+
+
+template <class T>
+INode<T>::INode() :
+	_rc(0)
+{
+	for(int i = 0 ; i < kBranchingFactor ; i++){
+		_children._inodes[i] = nullptr;
+	}
+}
+
+
+
+////////////////////////////////////////////		steady_vector
+
+
 
 template <class T>
 class steady_vector {
@@ -66,16 +116,6 @@ class steady_vector {
 
 
 	///////////////////////////////////////		Internals
-		//	### is sizeof(T) is the size of a pointer or smaller, store T directly in INode. ??? Or leaf node is always array of Ts.
-
-		private: struct INode {
-//			int32_t _rc;
-			void* _children[32];
-		};
-
-		private: struct ILeaf {
-			T _value;
-		};
 
 
 
