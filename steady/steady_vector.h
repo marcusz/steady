@@ -9,8 +9,9 @@
 #ifndef __steady__steady_vector__
 #define __steady__steady_vector__
 
-#include "cstddef"
-
+#include <cstddef>
+#include <initializer_list>
+#include <vector>
 
 template <class T>
 struct array {
@@ -33,18 +34,30 @@ Hash-consing for global deduplication
 template <class T>
 class steady_vector {
 	public: steady_vector();
+	public: steady_vector(const T entries[], size_t count);
+	public: steady_vector(std::initializer_list<T> args);
+
 	//public: steady_vector(T entries[], std::size_t count);
 	public: ~steady_vector();
-	public: void check_invariant() const;
+	public: bool check_invariant() const;
 
 	public: steady_vector(const steady_vector& rhs);
 	public: steady_vector& operator=(const steady_vector& rhs);
 	public: void swap(steady_vector& other);
 
+	// ###	operator== and !=
+
 	public: steady_vector push_back(const T& entry) const;
+	public: steady_vector update(size_t index, const T& entry) const;
 	public: std::size_t size() const;
 
-	public: const T& operator[](const std::size_t index) const;
+	public: const T& operator[](const std::size_t index) const{
+		return get_at(index);
+	}
+
+	public: const T& get_at(const std::size_t index) const;
+
+	public: std::vector<T> to_vec() const;
 
 
 	/////////////////		State

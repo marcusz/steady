@@ -78,7 +78,7 @@ class icppextension_runtime {
 
 
 #define TEST_VERIFY(exp) if(exp){}else{ throw std::logic_error("TEST_VERIFY failed"); }
-
+#define UT_VERIFY TEST_VERIFY
 
 void run_tests();
 

@@ -46,6 +46,8 @@ _type == 0x99 = inode
 */
 
 
+#if 000
+
 int size_to_depth(std::size_t size);
 
 
@@ -522,9 +524,12 @@ pvector<T> cons(const pvector<T>& v, const T& iValue){
 }
 
 
+#endif
 
 
 }	//	NSAPersistentVector
 
 
 #endif /* defined(__Perma_App__CAPersistentVector__) */
+
+

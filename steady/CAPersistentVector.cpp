@@ -10,6 +10,8 @@
 
 #include <vector>
 
+#if 000
+
 namespace NSAPersistentVector {
 
 
@@ -212,3 +214,4 @@ UNIT_TEST("", "", "", ""){
 
 
 
+#endif

@@ -128,7 +128,6 @@ class pvector {
 	}
 
 	public: bool check_invariant() const{
-		ASSERT(this != nullptr);
 		return true;
 	}
 
