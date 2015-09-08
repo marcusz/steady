@@ -34,6 +34,7 @@ Hash-consing for global deduplication
 template <class T>
 class steady_vector {
 	public: steady_vector();
+	public: steady_vector(const std::vector<T>& vec);
 	public: steady_vector(const T entries[], size_t count);
 	public: steady_vector(std::initializer_list<T> args);
 
@@ -48,8 +49,11 @@ class steady_vector {
 	// ###	operator== and !=
 
 	public: steady_vector push_back(const T& entry) const;
-	public: steady_vector update(size_t index, const T& entry) const;
+//	public: steady_vector update(size_t index, const T& entry) const;
 	public: std::size_t size() const;
+	public: bool empty() const{
+		return size() == 0;
+	}
 
 	public: const T& operator[](const std::size_t index) const{
 		return get_at(index);
@@ -60,9 +64,26 @@ class steady_vector {
 	public: std::vector<T> to_vec() const;
 
 
-	/////////////////		State
-		private: T* _allocation;
-		private: std::size_t _vector_count;
+
+	///////////////////////////////////////		Internals
+		//	### is sizeof(T) is the size of a pointer or smaller, store T directly in INode. ??? Or leaf node is always array of Ts.
+
+		private: struct INode {
+//			int32_t _rc;
+			void* _children[32];
+		};
+
+		private: struct ILeaf {
+			T _value;
+		};
+
+
+
+
+	///////////////////////////////////////		State
+		private: T* _root;
+//		private: T* _allocation;
+		private: std::size_t _size;
 };
 
 	
