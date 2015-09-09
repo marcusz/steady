@@ -12,6 +12,7 @@
 
 #include <iostream>
 
+/*
 int main(int argc, const char * argv[]){
 	// insert code here...
 	std::cout << "Hello, World!\n";
@@ -20,4 +21,24 @@ int main(int argc, const char * argv[]){
 
     return 0;
 }
+*/
 
+
+
+
+int main(int argc, const char * argv[])
+{
+	TDefaultRuntime runtime("");
+	SetRuntime(&runtime);
+	run_tests();
+
+	try {
+		TRACE("Hello, World 3!");
+	}
+	catch(...){
+		TRACE("Error");
+		return -1;
+	}
+
+    return 0;
+}

@@ -10,79 +10,161 @@
 
 #include <iostream>
 #include <cmath>
+#include <cassert>
+#include <sstream>
+
+//#include "Paths.h"
+
+
+TUniTestRegistry* TUnitTestReg::gRegistry = nullptr;
+
+
+namespace {
+	icppextension_runtime* gRuntimePtr = nullptr;
+}
+
+
+icppextension_runtime* GetRuntime(){
+	return gRuntimePtr;
+}
+
+void SetRuntime(icppextension_runtime* iRuntime){
+	gRuntimePtr = iRuntime;
+}
 
 
 
-std::vector<const TUnitTest> gUnitTests;
+
+void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]){
+	assert(iRuntime != nullptr);
+	assert(iS != nullptr);
+
+	iRuntime->icppextension_runtime__trace(iS);
+}
+
+void OnTraceHook(icppextension_runtime* iRuntime, const std::string& iS){
+	assert(iRuntime != nullptr);
+
+	iRuntime->icppextension_runtime__trace(iS.c_str());
+}
+
+void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS){
+	assert(iRuntime != nullptr);
+
+	iRuntime->icppextension_runtime__trace(iS.str().c_str());
+}
+
+void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
+	assert(iRuntime != nullptr);
+	assert(iExpression != nullptr);
+
+	iRuntime->icppextension_runtime__on_assert(iLocation, iExpression);
+	exit(-1);
+}
+
+void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
+	assert(iRuntime != nullptr);
+	assert(iExpression != nullptr);
+
+	iRuntime->icppextension_runtime__on_unit_test_failed(iLocation, iExpression);
+}
+
+/*
+std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]){
+	ASSERT(iRuntime != nullptr);
+	ASSERT(iModuleUnderTest != nullptr);
+	ASSERT(iSourceFilePath != nullptr);
+
+	const TAbsolutePath absPath(iSourceFilePath);
+	const TAbsolutePath parent = GetParent(absPath);
+	return parent.GetStringPath();
+}
+*/
+
+
 
 
 void run_tests(){
-	std::size_t test_count = gUnitTests.size();
-	std::size_t fail_count = 0;
-	std::cout << "Running " << test_count << " tests..." << std::endl;
-	for(long i = 0 ; i < test_count ; i++){
-		const TUnitTest& test = gUnitTests[i];
+	TRACE_FUNCTION();
+	ASSERT(TUnitTestReg::gRegistry != nullptr);
+
+	std::size_t test_count = TUnitTestReg::gRegistry->fTests.size();
+//	std::size_t fail_count = 0;
+
+	TRACE_SS("Running " << test_count << " tests...");
+
+	for(std::size_t i = 0 ; i < test_count ; i++){
+		const TUnitTestDefinition& test = TUnitTestReg::gRegistry->fTests[i];
+
+		std::stringstream testInfo;
+		testInfo << "Test #" << i
+			<< " " << test._class_under_test
+			<< " | " << test._function_under_test
+			<< " | " << test._scenario
+			<< " | " << test._expected_result;
+
 		try{
-			gUnitTests[i]._test_f();
+			SCOPED_TRACE(testInfo.str());
+			test._test_f();
 		}
 		catch(...){
-			std::cout
-				<< "FAILURE:\t"
-				<< test._class_under_test
-				<< " \t|\t" << test._function_under_test
-				<< " " << test._scenario
-				<< " " << test._expected_result << std::endl;
-			fail_count++;
+			TRACE("FAILURE: " + testInfo.str());
+//			fail_count++;
+			exit(-1);
 		}
 	}
 
-	if(fail_count == 0){
-		std::cout << "Success - " << test_count << " tests!" << std::endl;
+//	if(fail_count == 0){
+		TRACE_SS("Success - " << test_count << " tests!");
+//	}
+//	else{
+//		TRACE_SS("FAILED " << fail_count << " out of " << test_count << " tests!");
+//		exit(-1);
+//	}
+}
+
+
+
+//////////////////////////////////			TDefaultRuntime
+
+
+
+
+
+TDefaultRuntime::TDefaultRuntime(const std::string& iTestDataRoot) :
+	fTestDataRoot(iTestDataRoot),
+	fIndent(0)
+{
+}
+
+void TDefaultRuntime::icppextension_runtime__trace(const char s[]){
+//		for (auto &i: items){
+//		}
+	for(long i = 0 ; i < fIndent ; i++){
+		std::cout << "|\t";
 	}
-	else{
-		std::cout << "FAILED " << fail_count << " out of " << test_count << " tests!" << std::endl;
-	}
+
+	std::cout << std::string(s);
+	std::cout << std::endl;
+}
+
+void TDefaultRuntime::icppextension_runtime__add_log_indent(long iAdd){
+	fIndent += iAdd;
+}
+
+void TDefaultRuntime::icppextension_runtime__on_assert(const TSourceLocation& iLocation, const char iExpression[]){
+	TRACE_SS(std::string("Assertion failed ") << iLocation.fSourceFile << ", " << iLocation.fLineNumber << " \"" << iExpression << "\"");
+	perror("perror() says");
+	throw std::logic_error("assert");
+}
+
+void TDefaultRuntime::icppextension_runtime__on_unit_test_failed(const TSourceLocation& iLocation, const char iExpression[]){
+	TRACE_SS("Unit test failed " << iLocation.fSourceFile << ", " << iLocation.fLineNumber << " \"" << iExpression << "\"");
+	perror("perror() says");
+
+	throw std::logic_error("Unit test failed");
 }
 
 
 
-#if DEBUG
-//		???
-#else
-#endif
-
-
-#if NDEBUG
-#else
-#endif
-
-
-
-
-static void MyTest();
-TUnitTestReg xxxx("p1", "p2", "p3", "p4", MyTest);
-static void MyTest(){
-	TEST_VERIFY(true);
-}
-
-
-
-UNIT_TEST("cpp_extension", "sin()", "0.0", "return 0.0"){
-	TEST_VERIFY(std::sin(0.0f) == 0.0f);
-}
-
-UNIT_TEST("cpp_extension", "cos()", "0.0", "return 0.0"){
-	TEST_VERIFY(std::cos(0.0f) == 1.0f);
-}
-
-
-
-UNIT_TEST("cpp_extension", "misc", "", ""){
-	ASSERT(true);
-//	ASSERT(false);
-	TRACE("Test trace");
-	TEST_VERIFY(true);
-
-	std::cout << "Test" << std::endl;
-}
 

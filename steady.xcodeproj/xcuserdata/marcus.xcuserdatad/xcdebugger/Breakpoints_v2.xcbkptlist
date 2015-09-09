@@ -6,16 +6,32 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            shouldBeEnabled = "No"
+            shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "steady/steady_vector.cpp"
-            timestampString = "463438102.664605"
+            filePath = "steady/cpp_extension.cpp"
+            timestampString = "463489873.247331"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "137"
-            endingLineNumber = "137"
-            landmarkName = "swap(steady_vector&amp; rhs)"
+            startingLineNumber = "58"
+            endingLineNumber = "58"
+            landmarkName = "OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation&amp; iLocation, const char iExpression[])"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "steady/cpp_extension.cpp"
+            timestampString = "463489876.228692"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "66"
+            endingLineNumber = "66"
+            landmarkName = "OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation&amp; iLocation, const char iExpression[])"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
