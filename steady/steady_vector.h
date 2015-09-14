@@ -90,12 +90,6 @@ struct INode {
 
 	public: std::vector<INode<T>*> _inodes;
 	public: std::vector<Leaf<T>*> _leafs;
-/*
-	union {
-		INode* _inodes[kBranchingFactor];
-		Leaf<T>* _leafs[kBranchingFactor];
-	} _children;
-*/
 };
 
 
@@ -116,49 +110,53 @@ INode<T>::INode() :
 template <typename T>
 struct NodeRef {
 	public: NodeRef() :
-		_type(kNull)
+		_inode(nullptr),
+		_leaf(nullptr)
 	{
 		ASSERT(check_invariant());
 	}
 
 	public: NodeRef(INode<T>* node) :
-		_type(kInode)
+		_inode(nullptr),
+		_leaf(nullptr)
 	{
 		ASSERT(node != nullptr);
 		ASSERT(node->check_invariant());
 
-		_ptr._inode = node;
-		_ptr._inode->_rc++;
+		_inode = node;
+		_inode->_rc++;
 
 		ASSERT(check_invariant());
 	}
 
 	public: NodeRef(Leaf<T>* node) :
-		_type(kLeaf)
+		_inode(nullptr),
+		_leaf(nullptr)
 	{
 		ASSERT(node != nullptr);
 		ASSERT(node->check_invariant());
 
-		_ptr._leaf = node;
-		_ptr._leaf->_rc++;
+		_leaf = node;
+		_leaf->_rc++;
 
 		ASSERT(check_invariant());
 	}
 
 	public: NodeRef(const NodeRef<T>& ref) :
-		_type(ref._type)
+		_inode(nullptr),
+		_leaf(nullptr)
 	{
 		ASSERT(ref.check_invariant());
 
-		if(_type == kNull){
+		if(ref.GetType() == kNull){
 		}
-		else if(_type == kInode){
-			_ptr._inode = ref._ptr._inode;
-			_ptr._inode->_rc++;
+		else if(ref.GetType() == kInode){
+			_inode = ref._inode;
+			_inode->_rc++;
 		}
-		else if(_type == kLeaf){
-			_ptr._leaf = ref._ptr._leaf;
-			_ptr._leaf->_rc++;
+		else if(ref.GetType() == kLeaf){
+			_leaf = ref._leaf;
+			_leaf->_rc++;
 		}
 		else{
 			ASSERT(false);
@@ -170,20 +168,20 @@ struct NodeRef {
 	public: ~NodeRef(){
 		ASSERT(check_invariant());
 
-		if(_type == kNull){
+		if(GetType() == kNull){
 		}
-		else if(_type == kInode){
-			_ptr._inode->_rc--;
-			if(_ptr._inode->_rc == 0){
-				delete _ptr._inode;
-				_ptr._inode = nullptr;
+		else if(GetType() == kInode){
+			_inode->_rc--;
+			if(_inode->_rc == 0){
+				delete _inode;
+				_inode = nullptr;
 			}
 		}
-		else if(_type == kLeaf){
-			_ptr._leaf->_rc--;
-			if(_ptr._leaf->_rc == 0){
-				delete _ptr._leaf;
-				_ptr._leaf = nullptr;
+		else if(GetType() == kLeaf){
+			_leaf->_rc--;
+			if(_leaf->_rc == 0){
+				delete _leaf;
+				_leaf = nullptr;
 			}
 		}
 		else{
@@ -192,17 +190,8 @@ struct NodeRef {
 	}
 
 	public: bool check_invariant() const {
-		if(_type == kNull){
-		}
-		else if(_type == kInode){
-			ASSERT(_ptr._inode != nullptr);
-		}
-		else if(_type == kLeaf){
-			ASSERT(_ptr._leaf != nullptr);
-		}
-		else{
-			ASSERT(false);
-		}
+		ASSERT(_inode == nullptr || _leaf == nullptr);
+
 		return true;
 	}
 
@@ -211,8 +200,8 @@ struct NodeRef {
 		ASSERT(check_invariant());
 		ASSERT(other.check_invariant());
 
-		std::swap(_type, other._type);
-		std::swap(_ptr, other._ptr);
+		std::swap(_inode, other._inode);
+		std::swap(_leaf, other._leaf);
 
 		ASSERT(check_invariant());
 		ASSERT(other.check_invariant());
@@ -243,12 +232,23 @@ struct NodeRef {
 		kLeaf
 	};
 
-	public: NodeType _type;
+	public: NodeType GetType() const {
+		if(_inode == nullptr && _leaf == nullptr){
+			return kNull;
+		}
+		else if(_inode != nullptr){
+			return kInode;
+		}
+		else if(_leaf != nullptr){
+			return kLeaf;
+		}
+		else{
+			ASSERT(false);
+		}
+	}
 
-	public: union {
-		INode<T>* _inode;
-		Leaf<T>* _leaf;
-	} _ptr;
+	INode<T>* _inode;
+	Leaf<T>* _leaf;
 
 };
 
