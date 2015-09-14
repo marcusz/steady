@@ -494,7 +494,6 @@ class steady_vector {
 
 	public: steady_vector(NodeRef<T> root, std::size_t size);
 
-	private: NodeRef<T> insert(NodeRef<T> node, size_t size, size_t pos, const T& v) const;
 
 
 	///////////////////////////////////////		State

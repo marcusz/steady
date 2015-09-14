@@ -192,22 +192,6 @@ namespace {
 	}
 
 
-	/*
-		tree: original tree. Not changed by function. Tree can be a null-node.
-		size: number of values in original tree.
-		value: value to add to the end of the tree.
-		result: copy of "tree" that has "value" appended.
-			result and tree shares state
-	*/
-	template <class T>
-	NodeRef<T> internal_append(const NodeRef<T>& tree, size_t size, const T& value){
-		ASSERT(tree.check_invariant());
-
-	//	return update(tree, size, size, value);
-		return NodeRef<T>();
-	}
-
-
 }
 
 
@@ -348,12 +332,74 @@ steady_vector<T>::steady_vector(NodeRef<T> root, std::size_t size) :
 }
 
 
+
+
+
+
+
+
+namespace  {
+
+	/*
+		node: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
+
+		shift:
+		index: entry to store "value" to.
+		value: value to store.
+		result: copy of "tree" that has "value" stored. Same size as original.
+			result-tree and original tree shares internal state
+	*/
+	template <class T>
+	NodeRef<T> append_leaf_node(const NodeRef<T>& node, size_t shift, size_t index, const T& value){
+		ASSERT(node.GetType() == kInode || node.GetType() == kLeafNode);
+
+		size_t slotIndex = (index >> shift) & kBranchingFactorMask;
+		if(shift == 0){
+			ASSERT(node.GetType() == kLeafNode);
+
+			NodeRef<T> copy = copy_node_shallow(node);
+			copy._leaf->_values[slotIndex] = value;
+			return copy;
+		}
+		else{
+			ASSERT(node.GetType() == kInode);
+
+			auto child = node._inode->GetChild(slotIndex);
+			auto childCopy = update2(child, shift - kBranchingFactorShift, index, value);
+
+			std::vector<NodeRef<T>> children = node._inode->GetChildren();
+			children[slotIndex] = childCopy;
+			NodeRef<T> copy = NodeRef<T>(new INode<T>(children));
+			return copy;
+		}
+	}
+
+}
+
+
 template <class T>
-steady_vector<T> steady_vector<T>::push_back(const T& v) const{
+steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 	ASSERT(check_invariant());
 
-	NodeRef<T> newRoot = internal_append(_root, _size, v);
-	return steady_vector(newRoot, _size + 1);
+	if(_size == 0){
+		const auto root = make_1_tree(value);
+		return steady_vector<T>(root, 1);
+	}
+	else{
+		//	Does last leaf node have space left? Then we can use update2()...
+		if((_size & kBranchingFactorMask) != 0){
+			size_t shift = (CountToDepth(_size) - 1) * kBranchingFactorShift;
+			const auto root = update2(_root, shift, _size, value);
+			return steady_vector<T>(root, _size + 1);
+		}
+
+		//	Need to make new leaf node.
+		else{
+			size_t shift = (CountToDepth(_size) - 1) * kBranchingFactorShift;
+			const auto root = append_leaf_node(_root, shift, _size, value);
+			return steady_vector<T>(root, _size + 1);
+		}
+	}
 }
 
 
@@ -806,9 +852,9 @@ UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace value 10000 times"
 
 
 
-#if 0
 
 UNIT_TEST("steady_vector", "push_back()", "one item", "read back"){
+	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
 	TEST_VERIFY(a.size() == 0);
@@ -817,6 +863,7 @@ UNIT_TEST("steady_vector", "push_back()", "one item", "read back"){
 }
 
 UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
+	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
 	const auto c = b.push_back(9);
@@ -830,22 +877,22 @@ UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
 	TEST_VERIFY(c[0] == 4);
 	TEST_VERIFY(c[1] == 9);
 }
-#endif
 
 #if 0
-UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
-	const steady_vector<int> a;
-	const auto b = a.push_back(4);
-	const auto c = b.push_back(9);
+UNIT_TEST("steady_vector", "push_back()", "force 1 inode", "read back"){
+	TestFixture<int> f;
+	steady_vector<int> a;
+	const int count = kBranchingFactor + 1;
+	for(int i = 0 ; i < count ; i++){
+		a = a.push_back(1000 + i);
+	}
 
-	TEST_VERIFY(a.size() == 0);
+	TEST_VERIFY(a.size() == count);
 
-	TEST_VERIFY(b.size() == 1);
-	TEST_VERIFY(b[0] == 4);
-
-	TEST_VERIFY(c.size() == 2);
-	TEST_VERIFY(c[0] == 4);
-	TEST_VERIFY(c[1] == 9);
+	for(int i = 0 ; i < count ; i++){
+		const auto v = a[i];
+		TEST_VERIFY(v == i);
+	}
 }
 #endif
 
