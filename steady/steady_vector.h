@@ -37,14 +37,29 @@ static const size_t kBranchingFactorShift = 2;
 static const size_t kBranchingFactorAntiMask = 0xffffffff - kBranchingFactorMask;
 
 
-////////////////////////////////////////////		Leaf
+template <typename T>
+struct NodeRef;
+
+
+enum NodeType {
+	kNullNode = 4,
+	kInode,
+	kLeafNode
+};
+
+
+
+
+////////////////////////////////////////////		LeafNode
+
+
 
 
 
 //	1 -> kBranchingFactor values.
 template <class T>
-struct Leaf {
-	public: Leaf();
+struct LeafNode {
+	public: LeafNode();
 	public: bool check_invariant() const {
 		ASSERT(_rc >= 0);
 		ASSERT(_rc < 1000);
@@ -60,7 +75,7 @@ struct Leaf {
 };
 
 template <class T>
-Leaf<T>::Leaf() :
+LeafNode<T>::LeafNode() :
 	_rc(0)
 {
 	ASSERT(check_invariant());
@@ -68,42 +83,122 @@ Leaf<T>::Leaf() :
 
 
 
+
 ////////////////////////////////////////////		INode
+
+
 
 
 //	An INode points to up to 32 other iNodes alternatively 32 leaf nodes.
 template <class T>
 struct INode {
-	public: INode();
+	public: INode() :
+		_rc(0)
+	{
+		ASSERT(check_invariant());
+	}
+
+
+	public: INode(const std::vector<NodeRef<T>>& children){
+		ASSERT(children.size() > 0);
+		ASSERT(children.size() <= kBranchingFactor);
+
+		const auto childrenType = children[0].GetType();
+	#if DEBUG
+		//	Make sure children are of the same type!
+		{
+			for(auto i: children){
+				ASSERT(i.GetType() == childrenType);
+			}
+		}
+	#endif
+
+		if(childrenType == kInode){
+			for(auto i: children){
+				_child_inodes.push_back(i._inode);
+				i._inode->_rc++;
+			}
+		}
+		else if(childrenType == kLeafNode){
+			for(auto i: children){
+				_child_leaf_nodes.push_back(i._leaf);
+				i._leaf->_rc++;
+			}
+		}
+		else{
+			ASSERT(false);
+		}
+
+	}
+
 	public: bool check_invariant() const {
 		ASSERT(_rc >= 0);
 		ASSERT(_rc < 1000);
 
-		//	_inodes OR _leafs is used.
-		ASSERT(_inodes.empty() || _leafs.empty());
-		ASSERT(_inodes.size() <= kBranchingFactor);
-		ASSERT(_leafs.size() <= kBranchingFactor);
+		//	_inodes OR _child_leaf_nodes is used.
+		ASSERT(_child_inodes.empty() || _child_leaf_nodes.empty());
+		ASSERT(_child_inodes.size() <= kBranchingFactor);
+		ASSERT(_child_leaf_nodes.size() <= kBranchingFactor);
+//		ASSERT(_children.size() <= kBranchingFactor);
 		return true;
 	}
 
+	public: size_t GetChildCount() const{
+		ASSERT(check_invariant());
+
+		if(!_child_inodes.empty()){
+			return _child_inodes.size();
+		}
+		else{
+			return _child_leaf_nodes.size();
+		}
+	}
+
+	public: NodeRef<T> GetChild(size_t index){
+		ASSERT(check_invariant());
+
+		if(!_child_inodes.empty()){
+			return _child_inodes[index];
+		}
+		else{
+			return _child_leaf_nodes[index];
+		}
+	}
+
+	public: INode<T>* GetChildINode(size_t index){
+		ASSERT(check_invariant());
+		ASSERT(index < _child_inodes.size());
+
+		return _child_inodes[index];
+	}
+
+	public: LeafNode<T>* GetChildLeafNode(size_t index){
+		ASSERT(check_invariant());
+		ASSERT(index < _child_leaf_nodes.size());
+
+		return _child_leaf_nodes[index];
+	}
+
+
+
+	//////////////////////////////	State
+
+
 	public: int32_t _rc;
 
-	public: std::vector<INode<T>*> _inodes;
-	public: std::vector<Leaf<T>*> _leafs;
+	private: std::vector<INode<T>*> _child_inodes;
+	private: std::vector<LeafNode<T>*> _child_leaf_nodes;
+//	public: std::vector<void*> _children;
 };
 
 
 
-////////////////////////////////////////////		INode
+
+
+////////////////////////////////////////////		NodeRef<T>
 
 
 
-template <class T>
-INode<T>::INode() :
-	_rc(0)
-{
-	ASSERT(check_invariant());
-}
 
 
 
@@ -129,7 +224,7 @@ struct NodeRef {
 		ASSERT(check_invariant());
 	}
 
-	public: NodeRef(Leaf<T>* node) :
+	public: NodeRef(LeafNode<T>* node) :
 		_inode(nullptr),
 		_leaf(nullptr)
 	{
@@ -148,13 +243,13 @@ struct NodeRef {
 	{
 		ASSERT(ref.check_invariant());
 
-		if(ref.GetType() == kNull){
+		if(ref.GetType() == kNullNode){
 		}
 		else if(ref.GetType() == kInode){
 			_inode = ref._inode;
 			_inode->_rc++;
 		}
-		else if(ref.GetType() == kLeaf){
+		else if(ref.GetType() == kLeafNode){
 			_leaf = ref._leaf;
 			_leaf->_rc++;
 		}
@@ -168,7 +263,7 @@ struct NodeRef {
 	public: ~NodeRef(){
 		ASSERT(check_invariant());
 
-		if(GetType() == kNull){
+		if(GetType() == kNullNode){
 		}
 		else if(GetType() == kInode){
 			_inode->_rc--;
@@ -177,7 +272,7 @@ struct NodeRef {
 				_inode = nullptr;
 			}
 		}
-		else if(GetType() == kLeaf){
+		else if(GetType() == kLeafNode){
 			_leaf->_rc--;
 			if(_leaf->_rc == 0){
 				delete _leaf;
@@ -195,7 +290,6 @@ struct NodeRef {
 		return true;
 	}
 
-
 	public: void swap(NodeRef<T>& other){
 		ASSERT(check_invariant());
 		ASSERT(other.check_invariant());
@@ -206,7 +300,6 @@ struct NodeRef {
 		ASSERT(check_invariant());
 		ASSERT(other.check_invariant());
 	}
-
 
 	public: NodeRef<T>& operator=(const NodeRef<T>& other){
 		ASSERT(check_invariant());
@@ -223,33 +316,29 @@ struct NodeRef {
 	
 
 
-
 	///////////////////////////////////////		Internals
 
-	public: enum NodeType {
-		kNull = 4,
-		kInode,
-		kLeaf
-	};
 
 	public: NodeType GetType() const {
 		if(_inode == nullptr && _leaf == nullptr){
-			return kNull;
+			return kNullNode;
 		}
 		else if(_inode != nullptr){
 			return kInode;
 		}
 		else if(_leaf != nullptr){
-			return kLeaf;
+			return kLeafNode;
 		}
 		else{
 			ASSERT(false);
 		}
 	}
 
-	INode<T>* _inode;
-	Leaf<T>* _leaf;
 
+
+	///////////////////////////////////////		State
+		public: INode<T>* _inode;
+		public: LeafNode<T>* _leaf;
 };
 
 
@@ -301,7 +390,6 @@ class steady_vector {
 
 	///////////////////////////////////////		State
 		public: NodeRef<T> _root;
-//		private: T* _allocation;
 		public: std::size_t _size;
 };
 
