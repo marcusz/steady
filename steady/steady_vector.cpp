@@ -16,6 +16,189 @@
 
 //### Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in 
 
+
+
+
+
+
+
+
+
+
+
+
+/////////////////////////////////////////////			Building blocks
+
+
+
+
+size_t round_up(size_t value, size_t align){
+	auto r = value / align;
+	return r * align < value ? r + 1 : r;
+}
+
+
+
+
+template <class T>
+NodeRef<T> append_item(const NodeRef<T>& nodeRef, const T& value){
+	if(nodeRef._type == NodeRef<T>::kNull){
+		auto leaf = new Leaf<T>();
+		leaf._rc = 1;
+		leaf._values.push_back(value);
+		return NodeRef<T>(leaf);
+	}
+	else if(nodeRef._type == NodeRef<T>::kInode){
+	}
+	else if(nodeRef._type == NodeRef<T>::kLeaf){
+	}
+	else{
+		ASSERT(false);
+	}
+}
+
+/*
+	Returns how deep node hiearchy is for a tree with *count* values. Counts both leaf-nodes and inodes.
+	0: empty
+	1: one leaf node.
+	2: one inode with 1-4 leaf nodes.
+	3: two levels of inodes plus leaf nodes.
+*/
+int CountToDepth(size_t count){
+	const auto leafNodeCount = round_up(count, kBranchingFactor);
+
+	if(leafNodeCount == 0){
+		return 0;
+	}
+	else if(leafNodeCount == 1){
+		return 1;
+	}
+	else {
+		return 1 + CountToDepth(leafNodeCount);
+	}
+}
+
+
+template <class T>
+NodeRef<T> MakeLeaf(std::vector<T> values){
+	ASSERT(values.size() <= kBranchingFactor);
+
+	NodeRef<T> ref(new Leaf<T>());
+	ref._ptr._leaf->_rc = 1;
+	ref._ptr._leaf->_values = values;
+	return ref;
+}
+
+
+
+template <class T>
+NodeRef<T> MakeINode(const std::vector<NodeRef<T>>& children){
+	ASSERT(children.size() > 0);
+	ASSERT(children.size() <= kBranchingFactor);
+
+	const auto childrenType = children[0]._type;
+#if DEBUG
+	//	Make sure children are of the same type!
+	{
+		for(auto i: children){
+			ASSERT(i._type == childrenType);
+		}
+	}
+#endif
+
+
+	NodeRef<T> inodeRef(new INode<T>());
+	inodeRef._ptr._inode->_rc = 1;
+
+	if(childrenType == NodeRef<T>::kInode){
+		for(auto i: children){
+			inodeRef._ptr._inode->_inodes.push_back(i._ptr._inode);
+			i._ptr._inode->_rc++;
+		}
+	}
+	else if(childrenType == NodeRef<T>::kLeaf){
+		for(auto i: children){
+			inodeRef._ptr._inode->_leafs.push_back(i._ptr._leaf);
+			i._ptr._leaf->_rc++;
+		}
+	}
+	else{
+		ASSERT(false);
+	}
+
+	return inodeRef;
+}
+
+
+/*
+	Verifies the tree is valid.
+*/
+
+template <class T>
+bool tree_check_invariant(const NodeRef<T>& tree, size_t count){
+	ASSERT(tree.check_invariant());
+	return true;
+}
+
+
+/*
+	tree: original tree. Not changed by function. Tree can be a null-node.
+	count: number of values in original tree.
+	value: value to add to the end of the tree.
+	result: copy of "tree" that has "value" appended.
+		result and tree shares state
+*/
+
+template <class T>
+NodeRef<T> internal_append(const NodeRef<T>& tree, size_t count, const T& value){
+	ASSERT(tree.check_invariant());
+#if DEBUG
+	if(count == 0){
+		ASSERT(tree._type ==NodeRef<T>::kNull);
+	}
+	else{
+	}
+#endif
+
+	if(count == 0){
+		std::vector<T> temp;
+		temp.push_back(value);
+		auto leafNodeRef = MakeLeaf(temp);
+		return leafNodeRef;
+	}
+	else{
+		return steady_vector<T>();
+/*
+		auto newRoot = CopyPath(_size);
+
+
+
+		int inodeDepth = CountToDepth(_size);
+		const auto leafItems = _size & kBranchingFactorMask;
+		if(leafItems < kBranchingFactor){
+			NodeRef<T> newRoot;
+		}
+
+		auto a = append_item(_root, v);
+		steady_vector<T> result;
+		result._root = a;
+		result._size = _size + 1;
+		ASSERT(result.check_invariant());
+
+		return result;
+*/
+	}
+}
+
+
+
+
+/////////////////////////////////////////////			steady_vector
+
+
+
+
+
 template <class T>
 steady_vector<T>::steady_vector() :
 	_size(0)
@@ -38,10 +221,6 @@ steady_vector<T>::steady_vector(const std::vector<T>& vec) :
 
 
 
-size_t round_up(size_t value, size_t align){
-	auto r = value / align;
-	return r * align < value ? r + 1 : r;
-}
 
 
 #if 0
@@ -218,7 +397,7 @@ bool steady_vector<T>::check_invariant() const{
 	else{
 		ASSERT(_size >= 0);
 	}
-
+	ASSERT(tree_check_invariant(_root, _size));
 	return true;
 }
 
@@ -274,97 +453,6 @@ steady_vector<T>::steady_vector(NodeRef<T> root, std::size_t size) :
 
 
 
-
-
-
-template <class T>
-NodeRef<T> append_item(const NodeRef<T>& nodeRef, const T& value){
-	if(nodeRef._type == NodeRef<T>::kNull){
-		auto leaf = new Leaf<T>();
-		leaf._rc = 1;
-		leaf._values.push_back(value);
-		return NodeRef<T>(leaf);
-	}
-	else if(nodeRef._type == NodeRef<T>::kInode){
-	}
-	else if(nodeRef._type == NodeRef<T>::kLeaf){
-	}
-	else{
-		ASSERT(false);
-	}
-}
-
-/*
-	Returns how deep node hiearchy is for a tree with *count* values. Counts both leaf-nodes and inodes.
-	0: empty
-	1: one leaf node.
-	2: one inode with 1-4 leaf nodes.
-	3: two levels of inodes plus leaf nodes.
-*/
-int CountToDepth(size_t count){
-	const auto leafNodeCount = round_up(count, kBranchingFactor);
-
-	if(leafNodeCount == 0){
-		return 0;
-	}
-	else if(leafNodeCount == 1){
-		return 1;
-	}
-	else {
-		return 1 + CountToDepth(leafNodeCount);
-	}
-}
-
-
-template <class T>
-NodeRef<T> MakeLeaf(std::vector<T> values){
-	ASSERT(values.size() <= kBranchingFactor);
-
-	NodeRef<T> ref(new Leaf<T>());
-	ref._ptr._leaf->_rc = 1;
-	ref._ptr._leaf->_values = values;
-	return ref;
-}
-
-
-
-template <class T>
-NodeRef<T> MakeINode(const std::vector<NodeRef<T>>& children){
-	ASSERT(children.size() > 0);
-	ASSERT(children.size() <= kBranchingFactor);
-
-	const auto childrenType = children[0]._type;
-#if DEBUG
-	//	Make sure children are of the same type!
-	{
-		for(auto i: children){
-			ASSERT(i._type == childrenType);
-		}
-	}
-#endif
-
-
-	NodeRef<T> inodeRef(new INode<T>());
-	inodeRef._ptr._inode->_rc = 1;
-
-	if(childrenType == NodeRef<T>::kInode){
-		for(auto i: children){
-			inodeRef._ptr._inode->_inodes.push_back(i._ptr._inode);
-			i._ptr._inode->_rc++;
-		}
-	}
-	else if(childrenType == NodeRef<T>::kLeaf){
-		for(auto i: children){
-			inodeRef._ptr._inode->_leafs.push_back(i._ptr._leaf);
-			i._ptr._leaf->_rc++;
-		}
-	}
-	else{
-		ASSERT(false);
-	}
-
-	return inodeRef;
-}
 
 
 
@@ -774,7 +862,9 @@ UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
 	TEST_VERIFY(c[0] == 4);
 	TEST_VERIFY(c[1] == 9);
 }
+#endif
 
+#if 0
 UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
