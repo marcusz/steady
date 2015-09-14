@@ -19,14 +19,6 @@
 
 
 
-
-
-
-
-
-
-
-
 /////////////////////////////////////////////			Building blocks
 
 
@@ -37,25 +29,6 @@ size_t round_up(size_t value, size_t align){
 	return r * align < value ? r + 1 : r;
 }
 
-
-
-
-template <class T>
-NodeRef<T> append_item(const NodeRef<T>& nodeRef, const T& value){
-	if(nodeRef._type == NodeRef<T>::kNull){
-		auto leaf = new Leaf<T>();
-		leaf._rc = 1;
-		leaf._values.push_back(value);
-		return NodeRef<T>(leaf);
-	}
-	else if(nodeRef._type == NodeRef<T>::kInode){
-	}
-	else if(nodeRef._type == NodeRef<T>::kLeaf){
-	}
-	else{
-		ASSERT(false);
-	}
-}
 
 /*
 	Returns how deep node hiearchy is for a tree with *count* values. Counts both leaf-nodes and inodes.
@@ -135,43 +108,225 @@ NodeRef<T> MakeINode(const std::vector<NodeRef<T>>& children){
 */
 
 template <class T>
-bool tree_check_invariant(const NodeRef<T>& tree, size_t count){
+bool tree_check_invariant(const NodeRef<T>& tree, size_t size){
 	ASSERT(tree.check_invariant());
+#if DEBUG
+	if(size == 0){
+		ASSERT(tree._type == NodeRef<T>::kNull);
+	}
+	else{
+		ASSERT(tree._type != NodeRef<T>::kNull);
+	}
+#endif
 	return true;
 }
 
 
+
+
+
+
+/*
+*/
+template <class T>
+NodeRef<T> find_leaf(const NodeRef<T>& tree, size_t size, size_t index){
+	ASSERT(tree_check_invariant(tree, size));
+	ASSERT(index < size);
+
+	auto depth = CountToDepth(size);
+	ASSERT(depth > 0);
+
+	//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
+	size_t shift = (depth - 1) * kBranchingFactorShift;
+
+	NodeRef<T> node = tree;
+
+	//	Traverse all inodes that points to other inodes.
+	while(shift > kBranchingFactorShift){
+		size_t slot = (index >> shift) & kBranchingFactorMask;
+		INode<T>* childPtr = node._ptr._inode->_inodes[slot];
+		node = NodeRef<T>(childPtr);
+		shift -= kBranchingFactorShift;
+	}
+
+	//	Inode that points to leaf nodes?
+	if(shift == kBranchingFactorShift){
+		size_t slot = (index >> shift) & kBranchingFactorMask;
+		Leaf<T>* childPtr = node._ptr._inode->_leafs[slot];
+		node = NodeRef<T>(childPtr);
+		shift -= kBranchingFactorShift;
+	}
+
+	ASSERT(shift == 0);
+
+	ASSERT(node._type == NodeRef<T>::kLeaf);
+	return node;
+}
+
+
+//??? Path copying requires 31 * 6 RC-bumps!
+
+
+
+
+
+
+template <class T>
+NodeRef<T> make_1_tree(const T& value){
+	std::vector<T> temp;
+	temp.push_back(value);
+	auto leafNodeRef = MakeLeaf(temp);
+	ASSERT(tree_check_invariant(leafNodeRef, 1));
+	return leafNodeRef;
+}
+
+
+
+
+
+
 /*
 	tree: original tree. Not changed by function. Tree can be a null-node.
-	count: number of values in original tree.
+	size: number of values in original tree.
+	index: entry to store to. Can be same as size, this means append.
+	value: value to store.
+	result: copy of "tree" that has "value" stored. Same size as original, unless appending where it is +1.
+		result-tree and original tree shares internal state
+*/
+template <class T>
+NodeRef<T> update(const NodeRef<T>& tree, size_t size, size_t index, const T& value){
+	ASSERT(tree_check_invariant(tree, size));
+
+	if(size == 0){
+		return make_1_tree(value);
+	}
+	else{
+		auto depth = CountToDepth(size);
+		ASSERT(depth > 0);
+
+		//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
+		size_t shift = (depth - 1) * kBranchingFactorShift;
+
+		NodeRef<T> node = tree;
+		NodeRef<T> path;
+
+		//	Traverse all inodes that points to other inodes.
+		while(shift > kBranchingFactorShift){
+			size_t slot = (index >> shift) & kBranchingFactorMask;
+			INode<T>* childPtr = node._ptr._inode->_inodes[slot];
+			node = NodeRef<T>(childPtr);
+			shift -= kBranchingFactorShift;
+		}
+
+		//	Inode that points to leaf nodes?
+		if(shift == kBranchingFactorShift){
+			size_t slot = (index >> shift) & kBranchingFactorMask;
+			Leaf<T>* childPtr = node._ptr._inode->_leafs[slot];
+			node = NodeRef<T>(childPtr);
+			shift -= kBranchingFactorShift;
+		}
+
+		ASSERT(shift == 0);
+
+		ASSERT(node._type == NodeRef<T>::kLeaf);
+		return node;
+	}
+}
+
+
+
+
+
+
+
+
+
+/*
+	tree: original tree. Not changed by function. Tree can be a null-node.
+	size: number of values in original tree.
 	value: value to add to the end of the tree.
 	result: copy of "tree" that has "value" appended.
 		result and tree shares state
 */
-
 template <class T>
-NodeRef<T> internal_append(const NodeRef<T>& tree, size_t count, const T& value){
+NodeRef<T> internal_append(const NodeRef<T>& tree, size_t size, const T& value){
 	ASSERT(tree.check_invariant());
 #if DEBUG
-	if(count == 0){
-		ASSERT(tree._type ==NodeRef<T>::kNull);
+	if(size == 0){
+		ASSERT(tree._type == NodeRef<T>::kNull);
 	}
 	else{
 	}
 #endif
 
-	if(count == 0){
+	if(size == 0){
 		std::vector<T> temp;
 		temp.push_back(value);
 		auto leafNodeRef = MakeLeaf(temp);
 		return leafNodeRef;
 	}
 	else{
-		return steady_vector<T>();
+
+#if 0
+		auto depth = CountToDepth(size);
+		ASSERT(depth > 0);
+
+
+		//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
+		size_t shift = (depth - 1) * kBranchingFactorShift;
+
+		NodeRef<T> node = tree;
+		NodeRef<T> path;
+
+		//	Traverse all inodes that points to other inodes.
+		while(shift > kBranchingFactorShift){
+			size_t slot = (index >> shift) & kBranchingFactorMask;
+			INode<T>* childPtr = node._ptr._inode->_inodes[slot];
+			node = NodeRef<T>(childPtr);
+			shift -= kBranchingFactorShift;
+		}
+
+		//	Inode that points to leaf nodes?
+		if(shift == kBranchingFactorShift){
+			size_t slot = (index >> shift) & kBranchingFactorMask;
+			Leaf<T>* childPtr = node._ptr._inode->_leafs[slot];
+			node = NodeRef<T>(childPtr);
+			shift -= kBranchingFactorShift;
+		}
+
+		ASSERT(shift == 0);
+
+		ASSERT(node._type == NodeRef<T>::kLeaf);
+		return node;
+#endif
+
+
+
+/*
+		//	Fit one more item in the leaf?
+		if((count & kBranchingFactorMask) < kBranchingFactor){
+
+			std::vector<T> temp = tree._ptr._leaf->_leafs;
+			temp.push_back(value);
+			auto leafNodeRef = MakeLeaf(temp);
+			return leafNodeRef;
+		}
+		else{
+		}
+
+
+		if (tree._type == NodeRef<T>::kInode){
+		}
+		else if(tree._type == NodeRef<T>::kLeaf){
+		}
+		else{
+			ASSERT(false);
+		}
+*/
+		return NodeRef<T>();
+
 /*
 		auto newRoot = CopyPath(_size);
-
-
 
 		int inodeDepth = CountToDepth(_size);
 		const auto leafItems = _size & kBranchingFactorMask;
@@ -187,6 +342,9 @@ NodeRef<T> internal_append(const NodeRef<T>& tree, size_t count, const T& value)
 
 		return result;
 */
+
+
+		return NodeRef<T>();
 	}
 }
 
@@ -461,60 +619,9 @@ template <class T>
 steady_vector<T> steady_vector<T>::push_back(const T& v) const{
 	ASSERT(check_invariant());
 
-	if(_size == 0){
-		std::vector<T> temp;
-		temp.push_back(v);
-		auto leafNodeRef = MakeLeaf(temp);
-		return steady_vector<T>(leafNodeRef, 1);
-	}
-	else{
-		return steady_vector<T>();
-/*
-		auto newRoot = CopyPath(_size);
-
-
-
-		int inodeDepth = CountToDepth(_size);
-		const auto leafItems = _size & kBranchingFactorMask;
-		if(leafItems < kBranchingFactor){
-			NodeRef<T> newRoot;
-		}
-
-		auto a = append_item(_root, v);
-		steady_vector<T> result;
-		result._root = a;
-		result._size = _size + 1;
-		ASSERT(result.check_invariant());
-
-		return result;
-*/
-	}
+	NodeRef<T> newRoot = internal_append(_root, _size, v);
+	return steady_vector(newRoot, _size + 1);
 }
-
-
-
-#if 0
-template <class T>
-steady_vector<T> steady_vector<T>::update(size_t index, const T& v) const{
-	ASSERT(check_invariant());
-	ASSERT(index < _size);
-	
-	std::size_t new_count = _size + 1;
-
-	steady_vector<T> result;
-	result._allocation = new T[new_count];
-	result._size = new_count;
-
-	for(std::size_t i = 0 ; i < _size ; i++){
-		result._allocation[i] = _allocation[i];
-	}
-	result._allocation[_size] = v;
-
-	ASSERT(check_invariant());
-
-	return result;
-}
-#endif
 
 
 template <class T>
@@ -532,34 +639,9 @@ T steady_vector<T>::get_at(const std::size_t index) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	auto depth = CountToDepth(_size);
-	ASSERT(depth > 0);
-
-	//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
-	size_t shift = (depth - 1) * kBranchingFactorShift;
-
-	NodeRef<T> node = _root;
-
-	//	Traverse all inodes that points to other inodes.
-	while(shift > kBranchingFactorShift){
-		size_t slot = (index >> shift) & kBranchingFactorMask;
-		INode<T>* childPtr = node._ptr._inode->_inodes[slot];
-		node = NodeRef<T>(childPtr);
-		shift -= kBranchingFactorShift;
-	}
-
-	//	Inode that points to leaf nodes?
-	if(shift == kBranchingFactorShift){
-		size_t slot = (index >> shift) & kBranchingFactorMask;
-		Leaf<T>* childPtr = node._ptr._inode->_leafs[slot];
-		node = NodeRef<T>(childPtr);
-		shift -= kBranchingFactorShift;
-	}
-
-	ASSERT(shift == 0);
-
-	size_t slot = (index >> shift) & kBranchingFactorMask;
-	const T result = node._ptr._leaf->_values[slot];
+	const auto leaf = find_leaf(_root, _size, index);
+	const auto slotIndex = index & kBranchingFactorMask;
+	const T result = leaf._ptr._leaf->_values[slotIndex];
 	return result;
 }
 
