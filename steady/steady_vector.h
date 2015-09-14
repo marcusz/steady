@@ -54,32 +54,58 @@ enum NodeType {
 
 
 
-
-
+/*
 //	1 -> kBranchingFactor values.
+	Sets its internal RC to 0 and never changes it.
+*/
+
+
 template <class T>
 struct LeafNode {
-	public: LeafNode();
+	public: LeafNode() :
+		_rc(0)
+	{
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	public: LeafNode(const std::vector<T>& values) :
+		_rc(0),
+		_values(values)
+	{
+		ASSERT(values.size() <= kBranchingFactor);
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	public: ~LeafNode(){
+		ASSERT(check_invariant());
+		ASSERT(_rc == 0);
+
+		_debug_count--;
+	}
+
 	public: bool check_invariant() const {
 		ASSERT(_rc >= 0);
-		ASSERT(_rc < 1000);
+		ASSERT(_rc < 10000);
 		ASSERT(_values.size() <= kBranchingFactor);
 		return true;
 	}
+
+	private: LeafNode<T>& operator=(const LeafNode& other);
+	private: LeafNode(const LeafNode& other);
+
 
 
 	//////////////////////////////	State
 
 	public: int32_t _rc;
 	public: std::vector<T> _values;
+	public: static int _debug_count;
 };
 
-template <class T>
-LeafNode<T>::LeafNode() :
-	_rc(0)
-{
-	ASSERT(check_invariant());
-}
 
 
 
@@ -88,18 +114,24 @@ LeafNode<T>::LeafNode() :
 
 
 
+/*
+	An INode points to up to 32 other iNodes alternatively 32 leaf nodes.
+	Sets its internal RC to 0 and never changes it.
+*/
 
-//	An INode points to up to 32 other iNodes alternatively 32 leaf nodes.
 template <class T>
 struct INode {
 	public: INode() :
 		_rc(0)
 	{
+		_debug_count++;
 		ASSERT(check_invariant());
 	}
 
 
-	public: INode(const std::vector<NodeRef<T>>& children){
+	public: INode(const std::vector<NodeRef<T>>& children) :
+		_rc(0)
+	{
 		ASSERT(children.size() > 0);
 		ASSERT(children.size() <= kBranchingFactor);
 
@@ -115,31 +147,71 @@ struct INode {
 
 		if(childrenType == kInode){
 			for(auto i: children){
-				_child_inodes.push_back(i._inode);
 				i._inode->_rc++;
+				_child_inodes.push_back(i._inode);
 			}
 		}
 		else if(childrenType == kLeafNode){
 			for(auto i: children){
-				_child_leaf_nodes.push_back(i._leaf);
 				i._leaf->_rc++;
+				_child_leaf_nodes.push_back(i._leaf);
 			}
 		}
 		else{
 			ASSERT(false);
 		}
 
+		_debug_count++;
+		ASSERT(check_invariant());
 	}
+
+	public: ~INode(){
+		ASSERT(check_invariant());
+		ASSERT(_rc == 0);
+
+		_debug_count--;
+
+		//	Decrement RC of all children.
+		{
+			//	Use NodeRef<> to delete them if RC becomes 0.
+			auto childrenRefs = GetChildren();
+
+			for(auto i: _child_inodes){
+				i->_rc--;
+			}
+			_child_inodes.clear();
+
+			for(auto i: _child_leaf_nodes){
+				i->_rc--;
+			}
+			_child_leaf_nodes.clear();
+		}
+	}
+
+	private: INode<T>& operator=(const INode& other);
+	private: INode(const INode& other);
 
 	public: bool check_invariant() const {
 		ASSERT(_rc >= 0);
-		ASSERT(_rc < 1000);
+		ASSERT(_rc < 10000);
 
 		//	_inodes OR _child_leaf_nodes is used.
 		ASSERT(_child_inodes.empty() || _child_leaf_nodes.empty());
 		ASSERT(_child_inodes.size() <= kBranchingFactor);
 		ASSERT(_child_leaf_nodes.size() <= kBranchingFactor);
 //		ASSERT(_children.size() <= kBranchingFactor);
+
+		if(!_child_inodes.empty()){
+			for(auto i: _child_inodes){
+				ASSERT(i->check_invariant());
+			}
+		}
+		else{
+			for(auto i: _child_leaf_nodes){
+				ASSERT(i->check_invariant());
+			}
+		}
+
 		return true;
 	}
 
@@ -151,6 +223,25 @@ struct INode {
 		}
 		else{
 			return _child_leaf_nodes.size();
+		}
+	}
+
+	public: std::vector<NodeRef<T>> GetChildren(){
+		ASSERT(check_invariant());
+
+		if(!_child_inodes.empty()){
+			std::vector<NodeRef<T>> result;
+			for(auto i: _child_inodes){
+				result.push_back(NodeRef<T>(i));
+			}
+			return result;
+		}
+		else{
+			std::vector<NodeRef<T>> result;
+			for(auto i: _child_leaf_nodes){
+				result.push_back(NodeRef<T>(i));
+			}
+			return result;
 		}
 	}
 
@@ -185,10 +276,10 @@ struct INode {
 
 
 	public: int32_t _rc;
-
 	private: std::vector<INode<T>*> _child_inodes;
 	private: std::vector<LeafNode<T>*> _child_leaf_nodes;
-//	public: std::vector<void*> _children;
+
+	public: static int _debug_count;
 };
 
 
@@ -211,11 +302,14 @@ struct NodeRef {
 		ASSERT(check_invariant());
 	}
 
+	//	Will assume ownership of the input node - caller must not delete it after call returns.
+	//	Adds ref.
 	public: NodeRef(INode<T>* node) :
 		_inode(nullptr),
 		_leaf(nullptr)
 	{
 		ASSERT(node != nullptr);
+		ASSERT(node->_rc >= 0);
 		ASSERT(node->check_invariant());
 
 		_inode = node;
@@ -224,11 +318,14 @@ struct NodeRef {
 		ASSERT(check_invariant());
 	}
 
+	//	Will assume ownership of the input node - caller must not delete it after call returns.
+	//	Adds ref.
 	public: NodeRef(LeafNode<T>* node) :
 		_inode(nullptr),
 		_leaf(nullptr)
 	{
 		ASSERT(node != nullptr);
+		ASSERT(node->_rc >= 0);
 		ASSERT(node->check_invariant());
 
 		_leaf = node;
@@ -237,6 +334,7 @@ struct NodeRef {
 		ASSERT(check_invariant());
 	}
 
+	//	Uses reference counting to share all state.
 	public: NodeRef(const NodeRef<T>& ref) :
 		_inode(nullptr),
 		_leaf(nullptr)
@@ -287,6 +385,14 @@ struct NodeRef {
 	public: bool check_invariant() const {
 		ASSERT(_inode == nullptr || _leaf == nullptr);
 
+		if(_inode != nullptr){
+			ASSERT(_inode->_rc > 0);
+			ASSERT(_inode->check_invariant());
+		}
+		else if(_leaf != nullptr){
+			ASSERT(_leaf->_rc > 0);
+			ASSERT(_leaf->check_invariant());
+		}
 		return true;
 	}
 
@@ -320,6 +426,8 @@ struct NodeRef {
 
 
 	public: NodeType GetType() const {
+		ASSERT(_inode == nullptr || _leaf == nullptr);
+
 		if(_inode == nullptr && _leaf == nullptr){
 			return kNullNode;
 		}
@@ -364,8 +472,8 @@ class steady_vector {
 
 	// ###	operator== and !=
 
-	public: steady_vector push_back(const T& v) const;
-//	public: steady_vector update(size_t index, const T& v) const;
+	public: steady_vector push_back(const T& value) const;
+	public: steady_vector assoc(size_t index, const T& value) const;
 	public: std::size_t size() const;
 	public: bool empty() const{
 		return size() == 0;
@@ -379,6 +487,7 @@ class steady_vector {
 
 	public: std::vector<T> to_vec() const;
 
+	public: void trace_internals() const;
 
 
 	///////////////////////////////////////		Internals
