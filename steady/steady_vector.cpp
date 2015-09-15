@@ -73,6 +73,7 @@ struct LeafNode {
 		ASSERT(check_invariant());
 	}
 
+/*
 	//	values: 0 -> kBranchingFactor items.
 	public: LeafNode(const std::vector<T>& values) :
 		_rc(0)
@@ -86,6 +87,7 @@ struct LeafNode {
 		_debug_count++;
 		ASSERT(check_invariant());
 	}
+*/
 
 	public: LeafNode(const std::array<T, kBranchingFactor>& values) :
 		_rc(0),
@@ -117,7 +119,6 @@ struct LeafNode {
 	//////////////////////////////	State
 
 	public: std::atomic<int32_t> _rc;
-//	public: std::vector<T> _values;
 	public: std::array<T, kBranchingFactor> _values{};
 	public: static int _debug_count;
 };
@@ -496,9 +497,16 @@ namespace {
 	}
 
 	template <class T>
-	NodeRef<T> MakeLeaf(const std::vector<T>& values){
+	NodeRef<T> MakeLeafFromVector(const std::vector<T>& values){
 		ASSERT(values.size() <= kBranchingFactor);
 
+		std::array<T, kBranchingFactor> temp{};
+		std::copy(values.begin(), values.end(), temp.begin());
+		return NodeRef<T>(new LeafNode<T>(temp));
+	}
+
+	template <class T>
+	NodeRef<T> MakeLeafFromArray(const std::array<T, kBranchingFactor>& values){
 		return NodeRef<T>(new LeafNode<T>(values));
 	}
 
@@ -532,9 +540,6 @@ namespace {
 	}
 
 
-
-
-
 	template <class T>
 	NodeRef<T> find_leaf(const NodeRef<T>& tree, size_t size, size_t index){
 		ASSERT(tree_check_invariant(tree, size));
@@ -555,35 +560,6 @@ namespace {
 		ASSERT(node.GetType() == kLeafNode);
 		return node;
 	}
-
-
-	template <class T>
-	NodeRef<T> make_1_tree(const T& value){
-		std::vector<T> temp;
-		temp.push_back(value);
-		auto leafNodeRef = MakeLeaf(temp);
-		ASSERT(tree_check_invariant(leafNodeRef, 1));
-		return leafNodeRef;
-	}
-
-/*
-	template <class T>
-	NodeRef<T> copy_node_shallow(const NodeRef<T>& node){
-		if(node.GetType() == kNullNode){
-			return NodeRef<T>();
-		}
-		else if(node.GetType() == kInode){
-			return NodeRef<T>(new INode<T>(node._inode->GetChildrenWithNulls()));
-		}
-		if(node.GetType() == kLeafNode){
-			return NodeRef<T>(new LeafNode<T>(node._leaf->_values));
-		}
-		else{
-			ASSERT_UNREACHABLE;
-		}
-	}
-*/
-
 
 
 	/*
@@ -825,7 +801,7 @@ steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 	ASSERT(check_invariant());
 
 	if(_size == 0){
-		return steady_vector<T>(MakeLeaf<T>({value}), 1);
+		return steady_vector<T>(MakeLeafFromArray<T>({value}), 1);
 	}
 	else{
 
@@ -838,7 +814,7 @@ steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 
 		//	Allocate new *leaf-node*, adding it to tree.
 		else{
-			const auto leaf = MakeLeaf<T>({ value });
+			const auto leaf = MakeLeafFromArray<T>({ value });
 
 			auto shift = VectorSizeToShift(_size);
 			auto shift2 = VectorSizeToShift(_size + 1);
@@ -1106,7 +1082,7 @@ steady_vector<int> MakeManualVectorWith1(){
 	TestFixture<int> f(0, 1);
 
 	std::vector<int> values = {	7	};
-	NodeRef<int> leaf = MakeLeaf(values);
+	NodeRef<int> leaf = MakeLeafFromVector(values);
 	return steady_vector<int>(leaf, values.size());
 }
 
@@ -1128,7 +1104,7 @@ steady_vector<int> MakeManualVectorWith2(){
 	TestFixture<int> f(0, 1);
 
 	std::vector<int> values = {	7, 8	};
-	NodeRef<int> leaf = MakeLeaf(values);
+	NodeRef<int> leaf = MakeLeafFromVector(values);
 	return steady_vector<int>(leaf, values.size());
 }
 
@@ -1149,8 +1125,8 @@ UNIT_TEST("", "MakeManualVectorWith2()", "", "correct nodes"){
 
 steady_vector<int> MakeManualVectorWithBranchFactorPlus1(){
 	TestFixture<int> f(1, 2);
-	NodeRef<int> leaf0 = MakeLeaf(GenerateNumbers(7, kBranchingFactor, kBranchingFactor));
-	NodeRef<int> leaf1 = MakeLeaf(GenerateNumbers(7 + kBranchingFactor, 1, kBranchingFactor));
+	NodeRef<int> leaf0 = MakeLeafFromVector(GenerateNumbers(7, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf1 = MakeLeafFromVector(GenerateNumbers(7 + kBranchingFactor, 1, kBranchingFactor));
 	std::vector<NodeRef<int>> leafs = { leaf0, leaf1 };
 	NodeRef<int> inode = MakeINode(leafs);
 	return steady_vector<int>(inode, kBranchingFactor + 1);
@@ -1184,11 +1160,11 @@ steady_vector<int> MakeManualVectorWithBranchFactorSquarePlus1(){
 
 	std::vector<NodeRef<int>> leaves;
 	for(int i = 0 ; i < kBranchingFactor ; i++){
-		NodeRef<int> leaf = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * i, kBranchingFactor, kBranchingFactor));
+		NodeRef<int> leaf = MakeLeafFromVector(GenerateNumbers(1000 + kBranchingFactor * i, kBranchingFactor, kBranchingFactor));
 		leaves.push_back(leaf);
 	}
 
-	NodeRef<int> extraLeaf = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * kBranchingFactor + 0, 1, kBranchingFactor));
+	NodeRef<int> extraLeaf = MakeLeafFromVector(GenerateNumbers(1000 + kBranchingFactor * kBranchingFactor + 0, 1, kBranchingFactor));
 
 	NodeRef<int> inodeA = MakeINode<int>(leaves);
 	NodeRef<int> inodeB = MakeINode<int>({ extraLeaf });
