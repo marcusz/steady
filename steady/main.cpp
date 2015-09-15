@@ -12,16 +12,19 @@
 
 #include <iostream>
 
-/*
-int main(int argc, const char * argv[]){
-	// insert code here...
-	std::cout << "Hello, World!\n";
 
-	run_tests();
 
-    return 0;
+
+
+void Example(){
+	steady_vector<int> a;
+	a = a.push_back(3);
+	a = a.push_back(8);
+	a = a.push_back(11);
+
+	ASSERT(a.size() == 3);
 }
-*/
+
 
 
 
@@ -36,6 +39,7 @@ int main(int argc, const char * argv[])
 
 	try {
 		TRACE("Hello, World 3!");
+		Example();
 	}
 	catch(...){
 		TRACE("Error");

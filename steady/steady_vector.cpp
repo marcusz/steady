@@ -44,6 +44,256 @@ SOMEDAY
 */
 
 
+
+
+
+
+
+////////////////////////////////////////////		LeafNode
+
+
+
+/*
+//	1 -> kBranchingFactor values.
+	Sets its internal RC to 0 and never changes it.
+*/
+
+
+template <class T>
+struct LeafNode {
+	public: LeafNode() :
+		_rc(0),
+		_values(kBranchingFactor, T{})
+	{
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	//	values: 0 -> kBranchingFactor items.
+	public: LeafNode(const std::vector<T>& values) :
+		_rc(0),
+		_values(values)
+	{
+		//	Expand to fixed number of values.
+		_values.resize(kBranchingFactor, T{});
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	public: ~LeafNode(){
+		ASSERT(check_invariant());
+		ASSERT(_rc == 0);
+
+		_debug_count--;
+	}
+
+	public: bool check_invariant() const {
+		ASSERT(_rc >= 0);
+		ASSERT(_rc < 1000);
+		ASSERT(_values.size() == kBranchingFactor);
+		return true;
+	}
+
+	private: LeafNode<T>& operator=(const LeafNode& other);
+	private: LeafNode(const LeafNode& other);
+
+
+
+	//////////////////////////////	State
+
+	public: std::atomic<int32_t> _rc;
+	public: std::vector<T> _values;
+	public: static int _debug_count;
+};
+
+
+
+////////////////////////////////////////////		INode
+
+
+
+namespace {
+
+	template <class T>
+	bool validate_inode_children(const std::vector<T>& vec){
+		ASSERT(vec.size() >= 0);
+		ASSERT(vec.size() <= kBranchingFactor);
+
+		for(auto i: vec){
+			i.check_invariant();
+		}
+
+		if(vec.size() > 0){
+			const auto type = vec[0].GetType();
+			if(type == kNullNode){
+				for(auto i: vec){
+					ASSERT(i.GetType() == kNullNode);
+				}
+			}
+			else if(type == kInode){
+				int i = 0;
+				while(i < vec.size() && vec[i].GetType() == kInode){
+					i++;
+				}
+				while(i < vec.size()){
+					ASSERT(vec[i].GetType() == kNullNode);
+					i++;
+				}
+			}
+			else if(type == kLeafNode){
+				int i = 0;
+				while(i < vec.size() && vec[i].GetType() == kLeafNode){
+					i++;
+				}
+				while(i < vec.size()){
+					ASSERT(vec[i].GetType() == kNullNode);
+					i++;
+				}
+			}
+			else{
+				ASSERT(false);
+			}
+		}
+		return true;
+	}
+
+}
+
+
+/*
+	An INode has these states:
+		full set of iNode pointers or
+		full set of leaf node pointers or
+		empty vector.
+
+	You cannot mix inode and leaf nodes in the same INode.
+	INode pointers and leaf node pointers can be null, but the nulls are always at the end of the arrays.
+	Sets its internal RC to 0 and never changes it.
+*/
+
+template <class T>
+struct INode {
+	public: INode() :
+		_rc(0)
+	{
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	//	children: 0-32 children, all of the same type. kNullNodes can only appear at end of vector.
+	public: INode(const std::vector<NodeRef<T>>& children2) :
+		_rc(0)
+	{
+		ASSERT(children2.size() >= 0);
+		ASSERT(children2.size() <= kBranchingFactor);
+#if DEBUG
+		for(auto i: children2){
+			i.check_invariant();
+		}
+#endif
+
+		std::vector<NodeRef<T>> children = children2;
+		children.resize(kBranchingFactor, NodeRef<T>());
+		ASSERT(validate_inode_children(children));
+		_children = children;
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	public: ~INode(){
+		ASSERT(check_invariant());
+		ASSERT(_rc == 0);
+
+		_debug_count--;
+	}
+
+	private: INode<T>& operator=(const INode& other);
+	private: INode(const INode& other);
+
+	public: bool check_invariant() const {
+		ASSERT(_rc >= 0);
+		ASSERT(_rc < 10000);
+		ASSERT(validate_inode_children(_children));
+
+		return true;
+	}
+
+	//	Counts
+	public: size_t GetChildCountSkipNulls() const{
+		ASSERT(check_invariant());
+
+		size_t index = 0;
+		while(index < _children.size() && _children[index].GetType() != kNullNode){
+			index++;
+		}
+		return index;
+	}
+
+	public: std::vector<NodeRef<T>> GetChildrenWithNulls(){
+		ASSERT(check_invariant());
+
+		return _children;
+	}
+
+	public: NodeRef<T> GetChild(size_t index) const{
+		ASSERT(check_invariant());
+		ASSERT(index < kBranchingFactor);
+		ASSERT(index < _children.size());
+		return _children[index];
+	}
+
+	public: LeafNode<T>* GetChildLeafNode(size_t index){
+		ASSERT(check_invariant());
+		ASSERT(index < _children.size());
+
+		ASSERT(_children[0].GetType() == kLeafNode);
+		return _children[index]._leaf;
+	}
+
+
+
+	//////////////////////////////	State
+
+
+	public: std::atomic<int32_t> _rc;
+	private: std::vector<NodeRef<T>> _children;
+
+	public: static int _debug_count;
+};
+
+
+
+
+////////////////////////////////////////////		NodeRef<T>
+
+
+
+
+template <typename T>
+bool NodeRef<T>::check_invariant() const {
+	ASSERT(_inode == nullptr || _leaf == nullptr);
+
+	if(_inode != nullptr){
+		ASSERT(_inode->check_invariant());
+		ASSERT(_inode->_rc > 0);
+	}
+	else if(_leaf != nullptr){
+		ASSERT(_leaf->check_invariant());
+		ASSERT(_leaf->_rc > 0);
+	}
+	return true;
+}
+
+
+
+
+
+
+
+
 template <class T>
 int INode<T>::_debug_count = 0;
 
@@ -1210,7 +1460,6 @@ UNIT_TEST("steady_vector", "to_vec()", "50", "correct data"){
 }
 
 
-
 ////////////////////////////////////////////		steady_vector::steady_vector(const steady_vector& rhs)
 
 
@@ -1235,9 +1484,8 @@ UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 items",
 
 
 
-
-
 ////////////////////////////////////////////		steady_vector::operator=()
+
 
 
 UNIT_TEST("steady_vector", "operator=()", "empty", "empty"){
@@ -1263,6 +1511,3 @@ UNIT_TEST("steady_vector", "operator=()", "7 items", "identical, sharing root"){
 	TEST_VERIFY(b.to_vec() == data);
 	TEST_VERIFY(a.GetRoot()._leaf == b.GetRoot()._leaf);
 }
-
-
-
