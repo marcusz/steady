@@ -247,11 +247,14 @@ struct INode {
 
 	public: NodeRef<T> GetChild(size_t index){
 		ASSERT(check_invariant());
+		ASSERT(index < kBranchingFactor);
 
 		if(!_child_inodes.empty()){
+			ASSERT(index < _child_inodes.size());
 			return _child_inodes[index];
 		}
 		else{
+			ASSERT(index < _child_leaf_nodes.size());
 			return _child_leaf_nodes[index];
 		}
 	}
