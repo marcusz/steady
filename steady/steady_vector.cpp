@@ -594,10 +594,19 @@ struct TestFixture {
 
 
 
-std::vector<int> GenerateNumbers(int start, int count){
+std::vector<int> GenerateNumbers(int start, int count, int totalCount){
+	ASSERT(count >= 0);
+	ASSERT(totalCount >= count);
+
 	std::vector<int> a;
-	for(int i = 0 ; i < count ; i++){
+	int i = 0;
+	while(i < count){
 		a.push_back(start + i);
+		i++;
+	}
+	while(i < totalCount){
+		a.push_back(0);
+		i++;
 	}
 	return a;
 }
@@ -650,8 +659,8 @@ UNIT_TEST("steady_vector", "MakeManualVectorWith2()", "", "correct nodes"){
 
 steady_vector<int> MakeManualVectorWithBranchFactorPlus1(){
 	TestFixture<int> f(1, 2);
-	NodeRef<int> leaf0 = MakeLeaf(GenerateNumbers(7, kBranchingFactor));
-	NodeRef<int> leaf1 = MakeLeaf(GenerateNumbers(7 + kBranchingFactor, 1));
+	NodeRef<int> leaf0 = MakeLeaf(GenerateNumbers(7, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf1 = MakeLeaf(GenerateNumbers(7 + kBranchingFactor, 1, kBranchingFactor));
 	std::vector<NodeRef<int>> leafs = { leaf0, leaf1 };
 	NodeRef<int> inode = MakeINode(leafs);
 	return steady_vector<int>(inode, kBranchingFactor + 1);
@@ -671,17 +680,11 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorPlus1()", "", "corre
 
 	const auto leaf0 = a._root._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
-	TEST_VERIFY(leaf0->_values[0] == 7);
-	TEST_VERIFY(leaf0->_values[1] == 8);
-	TEST_VERIFY(leaf0->_values[2] == 9);
-	TEST_VERIFY(leaf0->_values[3] == 10);
+	TEST_VERIFY(leaf0->_values == GenerateNumbers(7 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
 
 	const auto leaf1 = a._root._inode->GetChildLeafNode(1);
 	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values[0] == 11);
-	TEST_VERIFY(leaf1->_values[1] == 0);
-	TEST_VERIFY(leaf1->_values[2] == 0);
-	TEST_VERIFY(leaf1->_values[3] == 0);
+	TEST_VERIFY(leaf1->_values == GenerateNumbers(7 + kBranchingFactor * 1, 1, kBranchingFactor));
 }
 
 
@@ -689,11 +692,19 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorPlus1()", "", "corre
 steady_vector<int> MakeManualVectorWithBranchFactorSquarePlus1(){
 	TestFixture<int> f(3, 5);
 
+	NodeRef<int> leaf0 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf1 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 1, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf2 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 2, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf3 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 3, kBranchingFactor, kBranchingFactor));
+	NodeRef<int> leaf4 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 4, 1, kBranchingFactor));
+
+/*
 	NodeRef<int> leaf0 = MakeLeaf<int>({ 1000, 1001, 1002, 1003 });
 	NodeRef<int> leaf1 = MakeLeaf<int>({ 1004, 1005, 1006, 1007 });
 	NodeRef<int> leaf2 = MakeLeaf<int>({ 1008, 1009, 1010, 1011 });
 	NodeRef<int> leaf3 = MakeLeaf<int>({ 1012, 1013, 1014, 1015 });
 	NodeRef<int> leaf4 = MakeLeaf<int>({ 1016 });
+*/
 
 	NodeRef<int> inodeA = MakeINode<int>({ leaf0, leaf1, leaf2, leaf3 });
 	NodeRef<int> inodeB = MakeINode<int>({ leaf4 });
@@ -726,35 +737,19 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorSquarePlus1()", "", 
 
 	const auto leaf0 = inodeA._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
-	TEST_VERIFY(leaf0->_values.size() == 4);
-	TEST_VERIFY(leaf0->_values[0] == 1000);
-	TEST_VERIFY(leaf0->_values[1] == 1001);
-	TEST_VERIFY(leaf0->_values[2] == 1002);
-	TEST_VERIFY(leaf0->_values[3] == 1003);
+	TEST_VERIFY(leaf0->_values == GenerateNumbers(1000 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
 
 	const auto leaf1 = inodeA._inode->GetChildLeafNode((1));
 	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values.size() == 4);
-	TEST_VERIFY(leaf1->_values[0] == 1004);
-	TEST_VERIFY(leaf1->_values[1] == 1005);
-	TEST_VERIFY(leaf1->_values[2] == 1006);
-	TEST_VERIFY(leaf1->_values[3] == 1007);
+	TEST_VERIFY(leaf1->_values == GenerateNumbers(1000 + kBranchingFactor * 1, kBranchingFactor, kBranchingFactor));
 
 	const auto leaf2 = inodeA._inode->GetChildLeafNode(2);
 	TEST_VERIFY(leaf2->_rc == 1);
-	TEST_VERIFY(leaf2->_values.size() == 4);
-	TEST_VERIFY(leaf2->_values[0] == 1008);
-	TEST_VERIFY(leaf2->_values[1] == 1009);
-	TEST_VERIFY(leaf2->_values[2] == 1010);
-	TEST_VERIFY(leaf2->_values[3] == 1011);
+	TEST_VERIFY(leaf2->_values == GenerateNumbers(1000 + kBranchingFactor * 2, kBranchingFactor, kBranchingFactor));
 
 	const auto leaf3 = inodeA._inode->GetChildLeafNode(3);
 	TEST_VERIFY(leaf3->_rc == 1);
-	TEST_VERIFY(leaf3->_values.size() == 4);
-	TEST_VERIFY(leaf3->_values[0] == 1012);
-	TEST_VERIFY(leaf3->_values[1] == 1013);
-	TEST_VERIFY(leaf3->_values[2] == 1014);
-	TEST_VERIFY(leaf3->_values[3] == 1015);
+	TEST_VERIFY(leaf3->_values == GenerateNumbers(1000 + kBranchingFactor * 3, kBranchingFactor, kBranchingFactor));
 
 
 	NodeRef<int> inodeB = rootINode._inode->GetChild(1);
@@ -766,10 +761,7 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorSquarePlus1()", "", 
 
 	const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf4->_rc == 1);
-	TEST_VERIFY(leaf4->_values[0] == 1016);
-	TEST_VERIFY(leaf4->_values[1] == 0);
-	TEST_VERIFY(leaf4->_values[2] == 0);
-	TEST_VERIFY(leaf4->_values[3] == 0);
+	TEST_VERIFY(leaf4->_values == GenerateNumbers(1000 + kBranchingFactor * 4, 1, kBranchingFactor));
 }
 
 
@@ -817,7 +809,7 @@ UNIT_TEST("steady_vector", "operator[]", "1 item", "read back"){
 
 
 
-UNIT_TEST("steady_vector", "operator[]", "5 items", "read back"){
+UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 items", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	TEST_VERIFY(a[0] == 7);
@@ -829,7 +821,7 @@ UNIT_TEST("steady_vector", "operator[]", "5 items", "read back"){
 }
 
 
-UNIT_TEST("steady_vector", "operator[]", "17 items", "read back"){
+UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 items", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorSquarePlus1();
 	TEST_VERIFY(a[0] == 1000);
@@ -1107,53 +1099,5 @@ UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 it
 
 
 
-
-
-
-#if 0
-
-struct T5ItemFixture {
-	T5ItemFixture(){
-//		_v = steady_vector<int>({	500, 501, 502, 504, 505 });
-	}
-
-
-	/////////////////////		State
-		const steady_vector<int> _v = {	500, 501, 502, 504, 505 };
-};
-
-
-
-struct T34ItemFixture {
-	T34ItemFixture(){
-		for(int i = 0 ; i < 34 ; i++){
-			_v = _v.push_back(i * 3);
-		}
-	}
-
-
-	/////////////////////		State
-		steady_vector<int> _v;
-};
-
-
-
-
-UNIT_TEST("steady_vector", "size()", "34 item vector", "34"){
-	T34ItemFixture f;
-	TEST_VERIFY(f._v.size() == 34);
-}
-
-UNIT_TEST("steady_vector", "swap()", "34 vs empty", "empty vs 34"){
-	const T34ItemFixture f;
-	steady_vector<int> v1 = f._v;
-	steady_vector<int> v2;
-	v1.swap(v2);
-	TEST_VERIFY(v1.size() == 0);
-	TEST_VERIFY(v2.size() == 34);
-}
-
-
-#endif
-
+//### test all member functions of steady_vector!
 
