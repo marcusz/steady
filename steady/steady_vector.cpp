@@ -21,8 +21,6 @@ NEXT
 ====================================================================================================================
 ### optimize operator==()
 
-### optimize internal node vectors - use fixed C-arrays instead of std::vector.
-
 
 first()
 rest()
@@ -30,6 +28,15 @@ rest()
 
 SOMEDAY
 ====================================================================================================================
+subvec - no trimming = very fast.
+
+assoc at end => append
+
+pool nodes?
+
+Over-alloc / reserve nodes?
+
+
 ??? Exception safety pls!
 
 ??? Path copying requires 31 * 6 RC-bumps!
@@ -39,8 +46,6 @@ SOMEDAY
 ### Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
 
 ### Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
-
-### Thread safe
 
 ### Support different branch factors per instance of steady_vector<T>? BF 2 is great for modification, bad for lookup.
 
@@ -637,11 +642,7 @@ template <class T>
 steady_vector<T>::steady_vector(std::initializer_list<T> args) :
 	_size(0)
 {
-	std::vector<T> temp;
-	for(auto i: args){
-		temp.push_back(i);
-	}
-
+	std::vector<T> temp(args.begin(), args.end());
 	steady_vector<T> temp2 = temp;
 	temp2.swap(*this);
 
