@@ -9,6 +9,7 @@
 #include "steady_vector.h"
 
 #include <algorithm>
+#include <array>
 
 /*
 NOW
@@ -19,6 +20,9 @@ NOW
 NEXT
 ====================================================================================================================
 ### optimize operator==()
+
+### optimize internal node vectors - use fixed C-arrays instead of std::vector.
+
 
 first()
 rest()
@@ -65,19 +69,28 @@ struct LeafNode {
 		_rc(0),
 		_values(kBranchingFactor, T{})
 	{
-
 		_debug_count++;
 		ASSERT(check_invariant());
 	}
 
 	//	values: 0 -> kBranchingFactor items.
 	public: LeafNode(const std::vector<T>& values) :
+		_rc(0)
+	{
+		ASSERT(values.size() <= kBranchingFactor);
+
+		for(int i = 0 ; i < values.size() ; i++){
+			_values[i] = values[i];
+		}
+
+		_debug_count++;
+		ASSERT(check_invariant());
+	}
+
+	public: LeafNode(const std::array<T, kBranchingFactor>& values) :
 		_rc(0),
 		_values(values)
 	{
-		//	Expand to fixed number of values.
-		_values.resize(kBranchingFactor, T{});
-
 		_debug_count++;
 		ASSERT(check_invariant());
 	}
@@ -104,7 +117,8 @@ struct LeafNode {
 	//////////////////////////////	State
 
 	public: std::atomic<int32_t> _rc;
-	public: std::vector<T> _values;
+//	public: std::vector<T> _values;
+	public: std::array<T, kBranchingFactor> _values{};
 	public: static int _debug_count;
 };
 
@@ -552,7 +566,7 @@ namespace {
 		return leafNodeRef;
 	}
 
-
+/*
 	template <class T>
 	NodeRef<T> copy_node_shallow(const NodeRef<T>& node){
 		if(node.GetType() == kNullNode){
@@ -568,7 +582,7 @@ namespace {
 			ASSERT_UNREACHABLE;
 		}
 	}
-
+*/
 
 
 
@@ -589,8 +603,7 @@ namespace {
 		if(shift == 0){
 			ASSERT(node.GetType() == kLeafNode);
 
-			NodeRef<T> copy = copy_node_shallow(node);
-
+			auto copy = NodeRef<T>(new LeafNode<T>(node._leaf->_values));
 			ASSERT(slotIndex < copy._leaf->_values.size());
 			copy._leaf->_values[slotIndex] = value;
 			return copy;
@@ -1077,6 +1090,15 @@ UNIT_TEST("", "GenerateNumbers()", "5 numbers", "correct vector"){
 	TEST_VERIFY(a == (std::vector<int>{ 8, 9, 10, 11, 0, 0, 0 }));
 }
 
+std::array<int, kBranchingFactor> GenerateLeaves(int start, int count){
+	const auto a = GenerateNumbers(start, count, kBranchingFactor);
+
+	std::array<int, kBranchingFactor> result;
+	for(int i = 0 ; i < kBranchingFactor ; i++){
+		result[i] = a[i];
+	}
+	return result;
+}
 
 
 
@@ -1148,11 +1170,11 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorPlus1()", "", "correct nodes"){
 
 	const auto leaf0 = a.GetRoot()._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
-	TEST_VERIFY(leaf0->_values == GenerateNumbers(7 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
+	TEST_VERIFY(leaf0->_values == GenerateLeaves(7 + kBranchingFactor * 0, kBranchingFactor));
 
 	const auto leaf1 = a.GetRoot()._inode->GetChildLeafNode(1);
 	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values == GenerateNumbers(7 + kBranchingFactor * 1, 1, kBranchingFactor));
+	TEST_VERIFY(leaf1->_values == GenerateLeaves(7 + kBranchingFactor * 1, 1));
 }
 
 
@@ -1194,7 +1216,7 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct node
 		for(int i = 0 ; i < kBranchingFactor ; i++){
 			const auto leafNode = inodeA._inode->GetChildLeafNode(i);
 			TEST_VERIFY(leafNode->_rc == 1);
-			TEST_VERIFY(leafNode->_values == GenerateNumbers(1000 + kBranchingFactor * i, kBranchingFactor, kBranchingFactor));
+			TEST_VERIFY(leafNode->_values == GenerateLeaves(1000 + kBranchingFactor * i, kBranchingFactor));
 		}
 
 	NodeRef<int> inodeB = rootINode._inode->GetChild(1);
@@ -1205,7 +1227,7 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct node
 
 		const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
 		TEST_VERIFY(leaf4->_rc == 1);
-		TEST_VERIFY(leaf4->_values == GenerateNumbers(1000 + kBranchingFactor * kBranchingFactor + 0, 1, kBranchingFactor));
+		TEST_VERIFY(leaf4->_values == GenerateLeaves(1000 + kBranchingFactor * kBranchingFactor + 0, 1));
 }
 
 
