@@ -64,10 +64,13 @@ namespace {
 	/*
 		Return how many steps to shift vector-index to get its *top-level* bits.
 
-		0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
+		-kBranchingFactorShift: empty tree
+		0: leaf-node level
+		kBranchingFactorShift: inode1 (inode that points to leafnodes)
+		>=kBranchingFactorShift: inode that points to inodes.
 	*/
-	size_t VectorSizeToShift(size_t size){
-		size_t shift = (CountToDepth(size) - 1) * kBranchingFactorShift;
+	int VectorSizeToShift(size_t size){
+		int shift = (CountToDepth(size) - 1) * kBranchingFactorShift;
 		return shift;
 	}
 
@@ -82,7 +85,7 @@ namespace {
 
 	template <class T>
 	NodeRef<T> MakeINode(const std::vector<NodeRef<T>>& children){
-		ASSERT(children.size() > 0);
+		ASSERT(children.size() >= 0);
 		ASSERT(children.size() <= kBranchingFactor);
 
 		return NodeRef<T>(new INode<T>(children));
@@ -122,8 +125,8 @@ namespace {
 
 		//	Traverse all inodes.
 		while(shift > 0){
-			size_t slot = (index >> shift) & kBranchingFactorMask;
-			node = node._inode->GetChild(slot);
+			size_t slotIndex = (index >> shift) & kBranchingFactorMask;
+			node = node._inode->GetChild(slotIndex);
 			shift -= kBranchingFactorShift;
 		}
 
@@ -149,7 +152,7 @@ namespace {
 			return NodeRef<T>();
 		}
 		else if(node.GetType() == kInode){
-			return NodeRef<T>(new INode<T>(node._inode->GetChildren()));
+			return NodeRef<T>(new INode<T>(node._inode->GetChildrenWithNulls()));
 		}
 		if(node.GetType() == kLeafNode){
 			return NodeRef<T>(new LeafNode<T>(node._leaf->_values));
@@ -172,7 +175,7 @@ namespace {
 			result-tree and original tree shares internal state
 	*/
 	template <class T>
-	NodeRef<T> modify_value(const NodeRef<T>& node, size_t shift, size_t index, const T& value){
+	NodeRef<T> modify_existing_value(const NodeRef<T>& node, int shift, size_t index, const T& value){
 		ASSERT(node.GetType() == kInode || node.GetType() == kLeafNode);
 
 		size_t slotIndex = (index >> shift) & kBranchingFactorMask;
@@ -189,9 +192,9 @@ namespace {
 			ASSERT(node.GetType() == kInode);
 
 			auto child = node._inode->GetChild(slotIndex);
-			auto childCopy = modify_value(child, shift - kBranchingFactorShift, index, value);
+			auto childCopy = modify_existing_value(child, shift - kBranchingFactorShift, index, value);
 
-			std::vector<NodeRef<T>> children = node._inode->GetChildren();
+			std::vector<NodeRef<T>> children = node._inode->GetChildrenWithNulls();
 			children[slotIndex] = childCopy;
 			NodeRef<T> copy = NodeRef<T>(new INode<T>(children));
 			return copy;
@@ -347,6 +350,18 @@ steady_vector<T>::steady_vector(NodeRef<T> root, std::size_t size) :
 
 namespace  {
 
+	template <class T>
+	NodeRef<T> make_new_path(int shift, const NodeRef<T>& append){
+		if(shift == 0){
+			return append;
+		}
+		else{
+			auto a = make_new_path(shift - kBranchingFactorShift, append);
+			NodeRef<T> b = MakeINode<T>({ a });
+			return b;
+		}
+	}
+
 	/*
 		original: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
 		size: current number of values in tree.
@@ -357,35 +372,32 @@ namespace  {
 		New tree may be same depth or +1 deep.
 	*/
 	template <class T>
-	NodeRef<T> append_leaf_node(const NodeRef<T>& original, size_t shift, const NodeRef<T> append){
+	NodeRef<T> append_leaf_node(const NodeRef<T>& original, int shift, size_t index, const NodeRef<T>& append){
 		ASSERT(original.check_invariant());
-		ASSERT(original.GetType() == kInode || original.GetType() == kLeafNode);
+		ASSERT(original.GetType() == kInode);
 		ASSERT(append.check_invariant());
+		ASSERT(append.GetType() == kLeafNode);
 
-		//	Is this a leaf node? Then replace it with a new inode that holds it and its new sibling.
-		if(shift == 0){
-			NodeRef<T> newParent = MakeINode<T>({ original, append });
-			return newParent;
-		}
+		size_t slotIndex = (index >> shift) & kBranchingFactorMask;
+		std::vector<NodeRef<T>> children = original._inode->GetChildrenWithNulls();
 
-		//	Inode holding leafs?
-		else if(shift == kBranchingFactorShift){
-			std::vector<NodeRef<T>> children = original._inode->GetChildren();
-
-			//	Can we fit new branch in this node?
-			if(children.size() < kBranchingFactor){
-				children.push_back(append);
-				NodeRef<T> newParent = MakeINode(children);
-				return newParent;
-			}
-			else{
-				NodeRef<T> newSiblingINode = MakeINode<T>({ append });
-				NodeRef<T> newParent = MakeINode<T>({ original, newSiblingINode });
-				return newParent;
-			}
+		//	Lowest level inode, pointing to leaf nodes.
+		if(shift == kBranchingFactorShift){
+			children[slotIndex] = append;
+			return MakeINode<T>(children);
 		}
 		else {
-			ASSERT(false);
+			const auto child = children[slotIndex];
+			if(child.GetType() == kNullNode){
+				NodeRef<T> child2 = make_new_path(shift - kBranchingFactorShift, append);
+				children[slotIndex] = child2;
+				return MakeINode<T>(children);
+			}
+			else{
+				NodeRef<T> child2 = append_leaf_node(child, shift - kBranchingFactorShift, index, append);
+				children[slotIndex] = child2;
+				return MakeINode<T>(children);
+			}
 		}
 	}
 
@@ -397,28 +409,34 @@ steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 	ASSERT(check_invariant());
 
 	if(_size == 0){
-		const auto root = make_1_tree(value);
-		return steady_vector<T>(root, 1);
+		return steady_vector<T>(MakeLeaf<T>({value}), 1);
 	}
 	else{
-		//	Does last leaf node have space left? Then we can use modify_value()...
+
+		//	Does last leaf node have space left? Then we can use modify_existing_value()...
 		if((_size & kBranchingFactorMask) != 0){
 			auto shift = VectorSizeToShift(_size);
-			const auto root = modify_value(_root, shift, _size, value);
+			const auto root = modify_existing_value(_root, shift, _size, value);
 			return steady_vector<T>(root, _size + 1);
 		}
 
-		//	Need to make new leaf node.
+		//	Allocate new *leaf-node*, adding it to tree.
 		else{
 			const auto leaf = MakeLeaf<T>({ value });
 
-			//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
 			auto shift = VectorSizeToShift(_size);
+			auto shift2 = VectorSizeToShift(_size + 1);
 
-			const auto root = append_leaf_node(_root, shift, leaf);
-			return steady_vector<T>(root, _size + 1);
-
-//			return steady_vector<T>();
+			//	Space left in root?
+			if(shift2 == shift){
+				const auto root = append_leaf_node(_root, shift, _size, leaf);
+				return steady_vector<T>(root, _size + 1);
+			}
+			else{
+				auto newPath = make_new_path(shift, leaf);
+				auto newRoot = MakeINode<T>({ _root, newPath });
+				return steady_vector<T>(newRoot, _size + 1);
+			}
 		}
 	}
 }
@@ -430,7 +448,7 @@ steady_vector<T> steady_vector<T>::assoc(size_t index, const T& value) const{
 	ASSERT(index < _size);
 
 	auto shift = VectorSizeToShift(_size);
-	const auto root = modify_value(_root, shift, index, value);
+	const auto root = modify_existing_value(_root, shift, index, value);
 	return steady_vector<T>(root, _size);
 }
 
@@ -479,7 +497,7 @@ namespace {
 		else if(node.GetType() == kInode){
 			TRACE_SS("<inode> RC: " << node._inode->_rc);
 			SCOPED_INDENT();
-			for(auto i: node._inode->GetChildren()){
+			for(auto i: node._inode->GetChildrenWithNulls()){
 				trace_node(i);
 			}
 		}
@@ -646,11 +664,11 @@ UNIT_TEST("steady_vector", "MakeVectorWith5()", "", "correct nodes"){
 
 	TEST_VERIFY(a._root.GetType() == kInode);
 	TEST_VERIFY(a._root._inode->_rc == 1);
-	TEST_VERIFY(a._root._inode->GetChildCount() == 2);
+	TEST_VERIFY(a._root._inode->GetChildCountSkipNulls() == 2);
 	TEST_VERIFY(a._root._inode->GetChild(0).GetType() == kLeafNode);
 	TEST_VERIFY(a._root._inode->GetChild(1).GetType() == kLeafNode);
 
-	LeafNode<int>* leaf0 = a._root._inode->GetChildLeafNode(0);
+	const auto leaf0 = a._root._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
 	TEST_VERIFY(leaf0->_values.size() == 4);
 	TEST_VERIFY(leaf0->_values[0] == 7);
@@ -658,7 +676,7 @@ UNIT_TEST("steady_vector", "MakeVectorWith5()", "", "correct nodes"){
 	TEST_VERIFY(leaf0->_values[2] == 9);
 	TEST_VERIFY(leaf0->_values[3] == 10);
 
-	LeafNode<int>* leaf1 = a._root._inode->GetChildLeafNode(1);
+	const auto leaf1 = a._root._inode->GetChildLeafNode(1);
 	TEST_VERIFY(leaf1->_rc == 1);
 	TEST_VERIFY(leaf1->_values[0] == 11);
 	TEST_VERIFY(leaf1->_values[1] == 0);
@@ -693,7 +711,7 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	NodeRef<int> rootINode = a._root;
 	TEST_VERIFY(rootINode.GetType() == kInode);
 	TEST_VERIFY(rootINode._inode->_rc == 2);
-	TEST_VERIFY(rootINode._inode->GetChildCount() == 2);
+	TEST_VERIFY(rootINode._inode->GetChildCountSkipNulls() == 2);
 	TEST_VERIFY(rootINode._inode->GetChild(0).GetType() == kInode);
 	TEST_VERIFY(rootINode._inode->GetChild(1).GetType() == kInode);
 
@@ -701,13 +719,13 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	NodeRef<int> inodeA = rootINode._inode->GetChild(0);
 	TEST_VERIFY(inodeA.GetType() == kInode);
 	TEST_VERIFY(inodeA._inode->_rc == 2);
-	TEST_VERIFY(inodeA._inode->GetChildCount() == 4);
+	TEST_VERIFY(inodeA._inode->GetChildCountSkipNulls() == 4);
 	TEST_VERIFY(inodeA._inode->GetChild(0).GetType() == kLeafNode);
 	TEST_VERIFY(inodeA._inode->GetChild(1).GetType() == kLeafNode);
 	TEST_VERIFY(inodeA._inode->GetChild(2).GetType() == kLeafNode);
 	TEST_VERIFY(inodeA._inode->GetChild(3).GetType() == kLeafNode);
 
-	LeafNode<int>* leaf0 = inodeA._inode->GetChildLeafNode(0);
+	const auto leaf0 = inodeA._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
 	TEST_VERIFY(leaf0->_values.size() == 4);
 	TEST_VERIFY(leaf0->_values[0] == 1000);
@@ -715,7 +733,7 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	TEST_VERIFY(leaf0->_values[2] == 1002);
 	TEST_VERIFY(leaf0->_values[3] == 1003);
 
-	LeafNode<int>* leaf1 = inodeA._inode->GetChildLeafNode((1));
+	const auto leaf1 = inodeA._inode->GetChildLeafNode((1));
 	TEST_VERIFY(leaf1->_rc == 1);
 	TEST_VERIFY(leaf1->_values.size() == 4);
 	TEST_VERIFY(leaf1->_values[0] == 1004);
@@ -723,7 +741,7 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	TEST_VERIFY(leaf1->_values[2] == 1006);
 	TEST_VERIFY(leaf1->_values[3] == 1007);
 
-	LeafNode<int>* leaf2 = inodeA._inode->GetChildLeafNode(2);
+	const auto leaf2 = inodeA._inode->GetChildLeafNode(2);
 	TEST_VERIFY(leaf2->_rc == 1);
 	TEST_VERIFY(leaf2->_values.size() == 4);
 	TEST_VERIFY(leaf2->_values[0] == 1008);
@@ -731,7 +749,7 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	TEST_VERIFY(leaf2->_values[2] == 1010);
 	TEST_VERIFY(leaf2->_values[3] == 1011);
 
-	LeafNode<int>* leaf3 = inodeA._inode->GetChildLeafNode(3);
+	const auto leaf3 = inodeA._inode->GetChildLeafNode(3);
 	TEST_VERIFY(leaf3->_rc == 1);
 	TEST_VERIFY(leaf3->_values.size() == 4);
 	TEST_VERIFY(leaf3->_values[0] == 1012);
@@ -743,11 +761,11 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 	NodeRef<int> inodeB = rootINode._inode->GetChild(1);
 	TEST_VERIFY(inodeB.GetType() == kInode);
 	TEST_VERIFY(inodeB._inode->_rc == 2);
-	TEST_VERIFY(inodeB._inode->GetChildCount() == 1);
+	TEST_VERIFY(inodeB._inode->GetChildCountSkipNulls() == 1);
 	TEST_VERIFY(inodeB._inode->GetChild(0).GetType() == kLeafNode);
 
 
-	LeafNode<int>* leaf4 = inodeB._inode->GetChildLeafNode(0);
+	const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf4->_rc == 1);
 	TEST_VERIFY(leaf4->_values[0] == 1016);
 	TEST_VERIFY(leaf4->_values[1] == 0);
@@ -973,7 +991,6 @@ UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all i
 	a.trace_internals();
 }
 
-#if 0
 UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all items"){
 	TestFixture<int> f;
 	const auto count = kBranchingFactor * kBranchingFactor * 2;
@@ -982,8 +999,17 @@ UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to
 	test_values(a, 1000);
 	a.trace_internals();
 }
-#endif
 
+
+
+UNIT_TEST("steady_vector", "push_back()", "4-levels of inodes + add leaf-node to last node", "read back all items"){
+	TestFixture<int> f;
+	const auto count = kBranchingFactor * kBranchingFactor * kBranchingFactor * kBranchingFactor * 2;
+	steady_vector<int> a = push_back_n(count, 1000);
+	TEST_VERIFY(a.size() == count);
+	test_values(a, 1000);
+	a.trace_internals();
+}
 
 
 
