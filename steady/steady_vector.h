@@ -444,7 +444,10 @@ class steady_vector {
 
 	public: steady_vector pop_back() const;
 
-//	public: T front() const;
+	public: bool operator==(const steady_vector& rhs) const;
+	public: bool operator!=(const steady_vector& rhs) const{
+		return !(*this == rhs);
+	}
 
 	public: std::size_t size() const;
 	public: bool empty() const{

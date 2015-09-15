@@ -13,14 +13,12 @@
 /*
 NOW
 ====================================================================================================================
-pop_back()
+### optimize pop_back()
 
 
 NEXT
 ====================================================================================================================
-###	operator== and !=
-
-
+### optimize operator==()
 
 first()
 rest()
@@ -474,6 +472,19 @@ steady_vector<T> steady_vector<T>::pop_back() const{
 	const auto temp = to_vec();
 	const auto result = steady_vector<T>(&temp[0], _size - 1);
 	return result;
+}
+
+
+/*
+	Correct but inefficient.
+*/
+template <class T>
+bool steady_vector<T>::operator==(const steady_vector& rhs) const{
+	ASSERT(check_invariant());
+
+	const auto a = to_vec();
+	const auto b = rhs.to_vec();
+	return a == b;
 }
 
 
@@ -1033,6 +1044,7 @@ UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to
 	a.trace_internals();
 }
 
+
 ////////////////////////////////////////////		steady_vector::pop_back()
 
 
@@ -1043,6 +1055,46 @@ UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector"){
 	const auto a = steady_vector<int>(data);
 	const auto b = a.pop_back();
 	TEST_VERIFY(b.to_vec() == data2);
+}
+
+
+
+////////////////////////////////////////////		steady_vector::operator==()
+
+
+UNIT_TEST("steady_vector", "operator==()", "empty vs empty", "true"){
+	TestFixture<int> f;
+
+	const std::vector<int> a;
+	const std::vector<int> b;
+	TEST_VERIFY(a == b);
+}
+
+UNIT_TEST("steady_vector", "operator==()", "empty vs 1", "false"){
+	TestFixture<int> f;
+
+	const std::vector<int> a;
+	const std::vector<int> b{ 33 };
+	TEST_VERIFY(!(a == b));
+}
+
+UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "true"){
+	TestFixture<int> f;
+	const auto data = GenerateNumbers(4, 50, 50);
+	const std::vector<int> a(data);
+	const std::vector<int> b(data);
+	TEST_VERIFY(a == b);
+}
+
+UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
+	TestFixture<int> f;
+	const auto data = GenerateNumbers(4, 50, 50);
+	auto data2 = data;
+	data2[47] = 0;
+
+	const std::vector<int> a(data);
+	const std::vector<int> b(data2);
+	TEST_VERIFY(!(a == b));
 }
 
 
