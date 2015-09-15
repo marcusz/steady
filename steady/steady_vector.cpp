@@ -18,7 +18,7 @@
 //??? Test break for branch factor != 4!!! Tests must find problems with 32.
 //	### Support different branch factors per instance of steady_vector<T>? BF 2 is great for modification, bad for lookup.
 //	### Support holes = allow using for ideal hash.
-
+//	### Use placement-now in leaf nodes to avoid default-constructing all leaf node items.
 
 
 template <class T>
@@ -357,11 +357,10 @@ namespace  {
 		New tree may be same depth or +1 deep.
 	*/
 	template <class T>
-	NodeRef<T> append_leaf_node(const NodeRef<T>& original, size_t shift, size_t size, const NodeRef<T> append){
-		ASSERT(tree_check_invariant(original, size));
+	NodeRef<T> append_leaf_node(const NodeRef<T>& original, size_t shift, const NodeRef<T> append){
+		ASSERT(original.check_invariant());
 		ASSERT(original.GetType() == kInode || original.GetType() == kLeafNode);
-
-		NodeRef<T> newRoot;
+		ASSERT(append.check_invariant());
 
 		//	Is this a leaf node? Then replace it with a new inode that holds it and its new sibling.
 		if(shift == 0){
@@ -416,7 +415,7 @@ steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 			//	0 = leaf-node level, 1 = inode1 (inode that points to leafnodes), 2 >= inode that points to inodes.
 			auto shift = VectorSizeToShift(_size);
 
-			const auto root = append_leaf_node(_root, shift, _size, leaf);
+			const auto root = append_leaf_node(_root, shift, leaf);
 			return steady_vector<T>(root, _size + 1);
 
 //			return steady_vector<T>();
@@ -599,8 +598,10 @@ UNIT_TEST("steady_vector", "MakeVectorWith1()", "", "correct nodes"){
 	TEST_VERIFY(a.size() == 1);
 	TEST_VERIFY(a._root.GetType() == kLeafNode);
 	TEST_VERIFY(a._root._leaf->_rc == 1);
-	TEST_VERIFY(a._root._leaf->_values.size() == 1);
 	TEST_VERIFY(a._root._leaf->_values[0] == 7);
+	TEST_VERIFY(a._root._leaf->_values[1] == 0);
+	TEST_VERIFY(a._root._leaf->_values[2] == 0);
+	TEST_VERIFY(a._root._leaf->_values[3] == 0);
 }
 
 
@@ -618,9 +619,10 @@ UNIT_TEST("steady_vector", "MakeVectorWith2()", "", "correct nodes"){
 	TEST_VERIFY(a.size() == 2);
 	TEST_VERIFY(a._root.GetType() == kLeafNode);
 	TEST_VERIFY(a._root._leaf->_rc == 1);
-	TEST_VERIFY(a._root._leaf->_values.size() == 2);
 	TEST_VERIFY(a._root._leaf->_values[0] == 7);
 	TEST_VERIFY(a._root._leaf->_values[1] == 8);
+	TEST_VERIFY(a._root._leaf->_values[2] == 0);
+	TEST_VERIFY(a._root._leaf->_values[3] == 0);
 }
 
 
@@ -658,8 +660,10 @@ UNIT_TEST("steady_vector", "MakeVectorWith5()", "", "correct nodes"){
 
 	LeafNode<int>* leaf1 = a._root._inode->GetChildLeafNode(1);
 	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values.size() == 1);
 	TEST_VERIFY(leaf1->_values[0] == 11);
+	TEST_VERIFY(leaf1->_values[1] == 0);
+	TEST_VERIFY(leaf1->_values[2] == 0);
+	TEST_VERIFY(leaf1->_values[3] == 0);
 }
 
 
@@ -745,9 +749,10 @@ UNIT_TEST("steady_vector", "MakeVectorWith17()", "", "correct nodes"){
 
 	LeafNode<int>* leaf4 = inodeB._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf4->_rc == 1);
-	TEST_VERIFY(leaf4->_values.size() == 1);
 	TEST_VERIFY(leaf4->_values[0] == 1016);
-
+	TEST_VERIFY(leaf4->_values[1] == 0);
+	TEST_VERIFY(leaf4->_values[2] == 0);
+	TEST_VERIFY(leaf4->_values[3] == 0);
 }
 
 
@@ -892,8 +897,29 @@ UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace value 10000 times"
 
 
 
+steady_vector<int> push_back_n(int count, int value0){
+//	TestFixture<int> f;
+	steady_vector<int> a;
+	for(int i = 0 ; i < count ; i++){
+		a = a.push_back(value0 + i);
+	}
+	return a;
+}
 
-UNIT_TEST("steady_vector", "push_back()", "one item", "read back"){
+void test_values(const steady_vector<int>& vec, int value0){
+	TestFixture<int> f;
+
+	for(int i = 0 ; i < vec.size() ; i++){
+		const auto value = vec[i];
+		const auto expected = value0 + i;
+		TEST_VERIFY(value == expected);
+	}
+}
+
+
+
+
+UNIT_TEST("steady_vector", "push_back()", "one item => 1 leaf node", "read back"){
 	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
@@ -902,8 +928,7 @@ UNIT_TEST("steady_vector", "push_back()", "one item", "read back"){
 	TEST_VERIFY(b[0] == 4);
 }
 
-#if 0
-UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
+UNIT_TEST("steady_vector", "push_back()", "two items => 1 leaf node", "read back"){
 	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
@@ -919,23 +944,53 @@ UNIT_TEST("steady_vector", "push_back()", "two items", "read back both"){
 	TEST_VERIFY(c[1] == 9);
 }
 
-UNIT_TEST("steady_vector", "push_back()", "force 1 inode", "read back"){
+UNIT_TEST("steady_vector", "push_back()", "1 inode", "read back"){
 	TestFixture<int> f;
-	steady_vector<int> a;
-	const int count = kBranchingFactor + 1;
-	for(int i = 0 ; i < count ; i++){
-		a = a.push_back(1000 + i);
-	}
-
+	const auto count = kBranchingFactor + 1;
+	steady_vector<int> a = push_back_n(count, 1000);
 	TEST_VERIFY(a.size() == count);
+	test_values(a, 1000);
 	a.trace_internals();
+}
 
-	for(int i = 0 ; i < count ; i++){
-		const auto v = a[i];
-		TEST_VERIFY(v == (1000 + i));
-	}
+
+
+UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "read back all items"){
+	TestFixture<int> f;
+	const auto count = kBranchingFactor + 2;
+	steady_vector<int> a = push_back_n(count, 1000);
+	TEST_VERIFY(a.size() == count);
+	test_values(a, 1000);
+	a.trace_internals();
+}
+
+UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all items"){
+	TestFixture<int> f;
+	const auto count = kBranchingFactor * kBranchingFactor + 1;
+	steady_vector<int> a = push_back_n(count, 1000);
+	TEST_VERIFY(a.size() == count);
+	test_values(a, 1000);
+	a.trace_internals();
+}
+
+#if 0
+UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all items"){
+	TestFixture<int> f;
+	const auto count = kBranchingFactor * kBranchingFactor * 2;
+	steady_vector<int> a = push_back_n(count, 1000);
+	TEST_VERIFY(a.size() == count);
+	test_values(a, 1000);
+	a.trace_internals();
 }
 #endif
+
+
+
+
+
+
+
+
 
 
 UNIT_TEST("steady_vector", "size()", "empty vector", "0"){
@@ -1056,17 +1111,6 @@ struct T34ItemFixture {
 		steady_vector<int> _v;
 };
 
-
-UNIT_TEST("steady_vector", "push_back()", "add 1000 items", "read back all items"){
-	steady_vector<int> v;
-	for(int i = 0 ; i < 1000 ; i++){
-		v = v.push_back(i * 3);
-	}
-
-	for(int i = 0 ; i < 1000 ; i++){
-		TEST_VERIFY(v[i] == i * 3);
-	}
-}
 
 
 

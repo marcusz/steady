@@ -63,18 +63,21 @@ enum NodeType {
 template <class T>
 struct LeafNode {
 	public: LeafNode() :
-		_rc(0)
+		_rc(0),
+		_values(kBranchingFactor, T{})
 	{
 
 		_debug_count++;
 		ASSERT(check_invariant());
 	}
 
+	//	values: 0 -> kBranchingFactor items.
 	public: LeafNode(const std::vector<T>& values) :
 		_rc(0),
 		_values(values)
 	{
-		ASSERT(values.size() <= kBranchingFactor);
+		//	Expand to fixed number of values.
+		_values.resize(kBranchingFactor, T{});
 
 		_debug_count++;
 		ASSERT(check_invariant());
@@ -89,8 +92,8 @@ struct LeafNode {
 
 	public: bool check_invariant() const {
 		ASSERT(_rc >= 0);
-		ASSERT(_rc < 10000);
-		ASSERT(_values.size() <= kBranchingFactor);
+		ASSERT(_rc < 1000);
+		ASSERT(_values.size() == kBranchingFactor);
 		return true;
 	}
 
