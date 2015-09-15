@@ -16,7 +16,9 @@
 //#include "Paths.h"
 
 
+#if CPP_EXTENSION__UNIT_TESTS_ON
 TUniTestRegistry* TUnitTestReg::gRegistry = nullptr;
+#endif
 
 
 namespace {
@@ -34,6 +36,37 @@ void SetRuntime(icppextension_runtime* iRuntime){
 
 
 
+
+
+
+//	ASSERT SUPPORT
+//	====================================================================================================================
+
+
+
+
+
+#if CPP_EXTENSION__ASSERT_ON
+
+void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
+	assert(iRuntime != nullptr);
+	assert(iExpression != nullptr);
+
+	iRuntime->icppextension_runtime__on_assert(iLocation, iExpression);
+	exit(-1);
+}
+
+#endif
+
+
+
+
+//	TRACE
+//	====================================================================================================================
+
+
+
+#if CPP_EXTENSION__TRACE_ON
 
 void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]){
 	assert(iRuntime != nullptr);
@@ -54,13 +87,19 @@ void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS){
 	iRuntime->icppextension_runtime__trace(iS.str().c_str());
 }
 
-void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
-	assert(iRuntime != nullptr);
-	assert(iExpression != nullptr);
+#endif
 
-	iRuntime->icppextension_runtime__on_assert(iLocation, iExpression);
-	exit(-1);
-}
+
+
+
+
+//	UNIT TEST SUPPORT
+//	====================================================================================================================
+
+
+
+
+#if CPP_EXTENSION__UNIT_TESTS_ON
 
 void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
 	assert(iRuntime != nullptr);
@@ -80,9 +119,6 @@ std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char
 	return parent.GetStringPath();
 }
 */
-
-
-
 
 void run_tests(){
 	TRACE_FUNCTION();
@@ -122,6 +158,16 @@ void run_tests(){
 //		exit(-1);
 //	}
 }
+
+#endif
+
+
+
+
+
+//	Default implementation
+//	====================================================================================================================
+
 
 
 
@@ -164,7 +210,5 @@ void TDefaultRuntime::icppextension_runtime__on_unit_test_failed(const TSourceLo
 
 	throw std::logic_error("Unit test failed");
 }
-
-
 
 

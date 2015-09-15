@@ -158,7 +158,7 @@ namespace {
 			return NodeRef<T>(new LeafNode<T>(node._leaf->_values));
 		}
 		else{
-			ASSERT(false);
+			ASSERT_UNREACHABLE;
 		}
 	}
 
@@ -502,6 +502,7 @@ namespace {
 			SCOPED_INDENT();
 			for(auto i: node._leaf->_values){
 				TRACE_SS(i);
+				(void)i;
 			}
 		}
 		else{
@@ -581,7 +582,6 @@ struct TestFixture {
 		TEST_VERIFY(inode_diff_count == _inode_expected_count);
 		TEST_VERIFY(leaf_expected_diff == _leaf_expected_count);
 	}
-
 
 	CScopedTrace _scopedTracer;
 	int _inode_count = 0;
@@ -670,7 +670,7 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorPlus1()", "", "corre
 	TestFixture<int> f;
 
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
-	TEST_VERIFY(a.size() == 5);
+	TEST_VERIFY(a.size() == kBranchingFactor + 1);
 
 	TEST_VERIFY(a._root.GetType() == kInode);
 	TEST_VERIFY(a._root._inode->_rc == 1);
@@ -688,35 +688,29 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorPlus1()", "", "corre
 }
 
 
-
+//17
 steady_vector<int> MakeManualVectorWithBranchFactorSquarePlus1(){
-	TestFixture<int> f(3, 5);
+	TestFixture<int> f(3, kBranchingFactor + 1);
 
-	NodeRef<int> leaf0 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
-	NodeRef<int> leaf1 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 1, kBranchingFactor, kBranchingFactor));
-	NodeRef<int> leaf2 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 2, kBranchingFactor, kBranchingFactor));
-	NodeRef<int> leaf3 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 3, kBranchingFactor, kBranchingFactor));
-	NodeRef<int> leaf4 = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * 4, 1, kBranchingFactor));
+	std::vector<NodeRef<int>> leaves;
+	for(int i = 0 ; i < kBranchingFactor ; i++){
+		NodeRef<int> leaf = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * i, kBranchingFactor, kBranchingFactor));
+		leaves.push_back(leaf);
+	}
 
-/*
-	NodeRef<int> leaf0 = MakeLeaf<int>({ 1000, 1001, 1002, 1003 });
-	NodeRef<int> leaf1 = MakeLeaf<int>({ 1004, 1005, 1006, 1007 });
-	NodeRef<int> leaf2 = MakeLeaf<int>({ 1008, 1009, 1010, 1011 });
-	NodeRef<int> leaf3 = MakeLeaf<int>({ 1012, 1013, 1014, 1015 });
-	NodeRef<int> leaf4 = MakeLeaf<int>({ 1016 });
-*/
+	NodeRef<int> extraLeaf = MakeLeaf(GenerateNumbers(1000 + kBranchingFactor * kBranchingFactor + 0, 1, kBranchingFactor));
 
-	NodeRef<int> inodeA = MakeINode<int>({ leaf0, leaf1, leaf2, leaf3 });
-	NodeRef<int> inodeB = MakeINode<int>({ leaf4 });
+	NodeRef<int> inodeA = MakeINode<int>(leaves);
+	NodeRef<int> inodeB = MakeINode<int>({ extraLeaf });
 	NodeRef<int> rootInode = MakeINode<int>({ inodeA, inodeB });
-	return steady_vector<int>(rootInode, 17);
+	return steady_vector<int>(rootInode, kBranchingFactor * kBranchingFactor + 1);
 }
 
 UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct nodes"){
 	TestFixture<int> f;
 
 	const auto a = MakeManualVectorWithBranchFactorSquarePlus1();
-	TEST_VERIFY(a.size() == 17);
+	TEST_VERIFY(a.size() == kBranchingFactor * kBranchingFactor + 1);
 
 	NodeRef<int> rootINode = a._root;
 	TEST_VERIFY(rootINode.GetType() == kInode);
@@ -725,43 +719,25 @@ UNIT_TEST("steady_vector", "MakeManualVectorWithBranchFactorSquarePlus1()", "", 
 	TEST_VERIFY(rootINode._inode->GetChild(0).GetType() == kInode);
 	TEST_VERIFY(rootINode._inode->GetChild(1).GetType() == kInode);
 
-
 	NodeRef<int> inodeA = rootINode._inode->GetChild(0);
-	TEST_VERIFY(inodeA.GetType() == kInode);
-	TEST_VERIFY(inodeA._inode->_rc == 2);
-	TEST_VERIFY(inodeA._inode->GetChildCountSkipNulls() == 4);
-	TEST_VERIFY(inodeA._inode->GetChild(0).GetType() == kLeafNode);
-	TEST_VERIFY(inodeA._inode->GetChild(1).GetType() == kLeafNode);
-	TEST_VERIFY(inodeA._inode->GetChild(2).GetType() == kLeafNode);
-	TEST_VERIFY(inodeA._inode->GetChild(3).GetType() == kLeafNode);
-
-	const auto leaf0 = inodeA._inode->GetChildLeafNode(0);
-	TEST_VERIFY(leaf0->_rc == 1);
-	TEST_VERIFY(leaf0->_values == GenerateNumbers(1000 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
-
-	const auto leaf1 = inodeA._inode->GetChildLeafNode((1));
-	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values == GenerateNumbers(1000 + kBranchingFactor * 1, kBranchingFactor, kBranchingFactor));
-
-	const auto leaf2 = inodeA._inode->GetChildLeafNode(2);
-	TEST_VERIFY(leaf2->_rc == 1);
-	TEST_VERIFY(leaf2->_values == GenerateNumbers(1000 + kBranchingFactor * 2, kBranchingFactor, kBranchingFactor));
-
-	const auto leaf3 = inodeA._inode->GetChildLeafNode(3);
-	TEST_VERIFY(leaf3->_rc == 1);
-	TEST_VERIFY(leaf3->_values == GenerateNumbers(1000 + kBranchingFactor * 3, kBranchingFactor, kBranchingFactor));
-
+		TEST_VERIFY(inodeA.GetType() == kInode);
+		TEST_VERIFY(inodeA._inode->_rc == 2);
+		TEST_VERIFY(inodeA._inode->GetChildCountSkipNulls() == kBranchingFactor);
+		for(int i = 0 ; i < kBranchingFactor ; i++){
+			const auto leafNode = inodeA._inode->GetChildLeafNode(i);
+			TEST_VERIFY(leafNode->_rc == 1);
+			TEST_VERIFY(leafNode->_values == GenerateNumbers(1000 + kBranchingFactor * i, kBranchingFactor, kBranchingFactor));
+		}
 
 	NodeRef<int> inodeB = rootINode._inode->GetChild(1);
-	TEST_VERIFY(inodeB.GetType() == kInode);
-	TEST_VERIFY(inodeB._inode->_rc == 2);
-	TEST_VERIFY(inodeB._inode->GetChildCountSkipNulls() == 1);
-	TEST_VERIFY(inodeB._inode->GetChild(0).GetType() == kLeafNode);
+		TEST_VERIFY(inodeB.GetType() == kInode);
+		TEST_VERIFY(inodeB._inode->_rc == 2);
+		TEST_VERIFY(inodeB._inode->GetChildCountSkipNulls() == 1);
+		TEST_VERIFY(inodeB._inode->GetChild(0).GetType() == kLeafNode);
 
-
-	const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
-	TEST_VERIFY(leaf4->_rc == 1);
-	TEST_VERIFY(leaf4->_values == GenerateNumbers(1000 + kBranchingFactor * 4, 1, kBranchingFactor));
+		const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
+		TEST_VERIFY(leaf4->_rc == 1);
+		TEST_VERIFY(leaf4->_values == GenerateNumbers(1000 + kBranchingFactor * kBranchingFactor + 0, 1, kBranchingFactor));
 }
 
 
@@ -775,11 +751,11 @@ UNIT_TEST("steady_vector", "CountToDepth()", "0", "-1"){
 	TEST_VERIFY(CountToDepth(2) == 1);
 	TEST_VERIFY(CountToDepth(3) == 1);
 
-	TEST_VERIFY(CountToDepth(5) == 2);
-	TEST_VERIFY(CountToDepth(16) == 2);
+	TEST_VERIFY(CountToDepth(kBranchingFactor + 1) == 2);
+	TEST_VERIFY(CountToDepth(kBranchingFactor * kBranchingFactor) == 2);
 
-	TEST_VERIFY(CountToDepth(17) == 3);
-	TEST_VERIFY(CountToDepth(64) == 3);
+	TEST_VERIFY(CountToDepth(kBranchingFactor * kBranchingFactor + 1) == 3);
+	TEST_VERIFY(CountToDepth(kBranchingFactor * kBranchingFactor *kBranchingFactor) == 3);
 }
 
 

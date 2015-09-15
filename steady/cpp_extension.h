@@ -15,96 +15,21 @@
 #include <sstream>
 
 
-////////////////////////////		Function prototyp for client unit test.
+#define CPP_EXTENSION__ASSERT_ON true
+#define CPP_EXTENSION__TRACE_ON true
+#define CPP_EXTENSION__UNIT_TESTS_ON true
 
 
-typedef void (*unit_test_function)();
 
 
-////////////////////////////		Macros
+
+//	PRIMITIVES
+//	====================================================================================================================
 
 
-#define PP_STRING(a) #a
-#define PP_CONCAT2(a,b)  a##b
-#define PP_CONCAT3(a, b, c) a##b##c
-#define PP_UNIQUE_LABEL_INTERNAL(prefix, suffix) PP_CONCAT2(prefix, suffix)
-#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), __FILE__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __COUNTER__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), PP_UNIQUE_LABEL_INTERNAL(abcd, HashString(__FILE__)))
-
-/*
-// boiler-plate
-#define CONCATENATE_DETAIL(x, y) x##y
-#define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
-#define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
-
-// per-transform type
-#define GL_TRANSLATE_DETAIL(n, x, y, z) GlTranslate n(x, y, z)
-#define GL_TRANSLATE(x, y, z) GL_TRANSLATE_DETAIL(MAKE_UNIQUE(_trans_), x, y, z)
-*/
 
 
-////////////////////////////		TUnitTestDefinition
 
-
-/**
-	The defintion of a single unit test, including the function itself.
-*/
-
-struct TUnitTestDefinition {
-	TUnitTestDefinition(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
-	:
-		_class_under_test(p1),
-		_function_under_test(p2),
-		_scenario(p3),
-		_expected_result(p4),
-		_test_f(f)
-	{
-	}
-
-
-	////////////////		State.
-		std::string _class_under_test;
-
-		std::string _function_under_test;
-		std::string _scenario;
-		std::string _expected_result;
-
-		unit_test_function _test_f;
-};
-
-
-////////////////////////////		TUnitTestDefinition
-
-
-/**
-	Stores all unit tests registered for the entire executable.
-*/
-
-struct TUniTestRegistry {
-	public: std::vector<const TUnitTestDefinition> fTests;
-};
-
-
-////////////////////////////		TUnitTestDefinition
-
-
-/**
-	This is part of an RAII-mechansim to register and unregister unit-tests.
-*/
-
-struct TUnitTestReg {
-	static TUniTestRegistry* gRegistry;
-
-	TUnitTestReg(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
-		TUnitTestDefinition test(p1, p2, p3, p4, f);
-		if(!gRegistry){
-			gRegistry = new TUniTestRegistry();
-		}
-		gRegistry->fTests.push_back(test);
-	}
-};
 
 
 ////////////////////////////		TSourceLocation
@@ -176,6 +101,72 @@ icppextension_runtime* GetRuntime();
 void SetRuntime(icppextension_runtime* iRuntime);
 
 
+
+
+
+
+//	WORKAROUNDS
+//	====================================================================================================================
+
+
+
+
+
+////////////////////////////		Macros
+
+
+#define PP_STRING(a) #a
+#define PP_CONCAT2(a,b)  a##b
+#define PP_CONCAT3(a, b, c) a##b##c
+#define PP_UNIQUE_LABEL_INTERNAL(prefix, suffix) PP_CONCAT2(prefix, suffix)
+#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__)
+//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), __FILE__)
+//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __COUNTER__)
+//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), PP_UNIQUE_LABEL_INTERNAL(abcd, HashString(__FILE__)))
+
+/*
+// boiler-plate
+#define CONCATENATE_DETAIL(x, y) x##y
+#define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
+#define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
+
+// per-transform type
+#define GL_TRANSLATE_DETAIL(n, x, y, z) GlTranslate n(x, y, z)
+#define GL_TRANSLATE(x, y, z) GL_TRANSLATE_DETAIL(MAKE_UNIQUE(_trans_), x, y, z)
+*/
+
+
+
+
+
+
+//	ASSERT SUPPORT
+//	====================================================================================================================
+
+#if CPP_EXTENSION__ASSERT_ON
+
+void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]) __dead2;
+
+#define ASSERT(x) if(x){}else {OnAssertHook(::GetRuntime(), TSourceLocation(__FILE__, __LINE__), PP_STRING(x)); }
+
+#define ASSERT_UNREACHABLE ASSERT(false)
+#else
+
+#define ASSERT(x)
+#define ASSERT_UNREACHABLE throw std::logic_error("")
+
+#endif
+
+
+
+
+
+
+//	TRACE
+//	====================================================================================================================
+
+
+
 ////////////////////////////		CScopedTrace
 
 /**
@@ -184,27 +175,35 @@ void SetRuntime(icppextension_runtime* iRuntime);
 
 struct CScopedTrace {
 	CScopedTrace(const char s[]){
+#if CPP_EXTENSION__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s);
 		r->icppextension_runtime__trace("{");
 		r->icppextension_runtime__add_log_indent(1);
+#endif
 	}
 	CScopedTrace(const std::string& s){
+#if CPP_EXTENSION__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s.c_str());
 		r->icppextension_runtime__trace("{");
 		r->icppextension_runtime__add_log_indent(1);
+#endif
 	}
 	CScopedTrace(const std::stringstream& s){
+#if CPP_EXTENSION__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s.str().c_str());
 		r->icppextension_runtime__trace("{");
 		r->icppextension_runtime__add_log_indent(1);
+#endif
 	}
 	~CScopedTrace(){
+#if CPP_EXTENSION__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__add_log_indent(-1);
 		r->icppextension_runtime__trace("}");
+#endif
 	}
 };
 
@@ -217,6 +216,7 @@ struct CScopedTrace {
 */
 
 struct CScopedIndent {
+#if CPP_EXTENSION__TRACE_ON
 	CScopedIndent(){
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__add_log_indent(1);
@@ -225,7 +225,11 @@ struct CScopedIndent {
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__add_log_indent(-1);
 	}
+#endif
 };
+
+#if CPP_EXTENSION__TRACE_ON
+
 
 ////////////////////////////		Hook functions.
 
@@ -237,29 +241,9 @@ struct CScopedIndent {
 void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]);
 void OnTraceHook(icppextension_runtime* iRuntime, const std::string& iS);
 void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS);
-void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]) __dead2;
-void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]);
-
-std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]);
 
 
-////////////////////////////		Hook functions.
-
-/**
-	Client application calls this function run all unit tests.
-	It will handle tracing and exceptions etc.
-	On unit-test failure this function exits the executable.
-*/
-void run_tests();
-
-
-
-////////////////////////////		Client-API - macros
-
-
-
-
-//	### Use runtime as arg.
+//	### Use runtime as explicit argument instead?
 #define TRACE(s) ::OnTraceHook(::GetRuntime(), s)
 #define TRACE_SS(x) {std::stringstream ss; ss << x; ::OnTraceHook(::GetRuntime(), ss);}
 
@@ -274,9 +258,120 @@ void run_tests();
 #define TRACE_FUNCTION() CScopedTrace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
 
 
-#define ASSERT(x) if(x){}else {OnAssertHook(::GetRuntime(), TSourceLocation(__FILE__, __LINE__), PP_STRING(x)); }
+#else
+
+#define TRACE(s)
+#define TRACE_SS(s)
+
+#define SCOPED_TRACE(s)
+#define SCOPED_INDENT()
+#define TRACE_FUNCTION()
 
 
+#endif
+
+
+
+
+//	UNIT TEST SUPPORT
+//	====================================================================================================================
+
+
+#if CPP_EXTENSION__UNIT_TESTS_ON
+
+
+typedef void (*unit_test_function)();
+
+
+////////////////////////////		TUnitTestDefinition
+
+
+/**
+	The defintion of a single unit test, including the function itself.
+*/
+
+struct TUnitTestDefinition {
+	TUnitTestDefinition(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
+	:
+		_class_under_test(p1),
+		_function_under_test(p2),
+		_scenario(p3),
+		_expected_result(p4),
+		_test_f(f)
+	{
+	}
+
+
+	////////////////		State.
+		std::string _class_under_test;
+
+		std::string _function_under_test;
+		std::string _scenario;
+		std::string _expected_result;
+
+		unit_test_function _test_f;
+};
+
+////////////////////////////		TUnitTestDefinition
+
+
+/**
+	Stores all unit tests registered for the entire executable.
+*/
+
+struct TUniTestRegistry {
+	public: std::vector<const TUnitTestDefinition> fTests;
+};
+
+
+
+////////////////////////////		TUnitTestDefinition
+
+
+/**
+	This is part of an RAII-mechansim to register and unregister unit-tests.
+*/
+
+struct TUnitTestReg {
+	static TUniTestRegistry* gRegistry;
+
+	TUnitTestReg(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
+		TUnitTestDefinition test(p1, p2, p3, p4, f);
+		if(!gRegistry){
+			gRegistry = new TUniTestRegistry();
+		}
+		gRegistry->fTests.push_back(test);
+	}
+};
+
+
+
+////////////////////////////		Hooks
+
+
+
+void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]);
+std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]);
+
+
+
+////////////////////////////		run_tests()
+
+
+/**
+	Client application calls this function run all unit tests.
+	It will handle tracing and exceptions etc.
+	On unit-test failure this function exits the executable.
+*/
+void run_tests();
+
+
+
+////////////////////////////		Macros used by client code
+
+
+
+//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
 #define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
 	static void PP_UNIQUE_LABEL(fun_)(); \
 	static TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(fun_)); \
@@ -288,11 +383,36 @@ void run_tests();
 #define TEST_VERIFY UT_VERIFY
 
 
+
 /**
 	gives you native, absolute path to your modules test-directory.
 */
 //#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(GetRuntime(), moduleUnderTest, __FILE__)
 
+#else
+
+
+
+//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
+#define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
+	static void PP_UNIQUE_LABEL(fun_)()
+
+#define UT_VERIFY(exp)
+#define TEST_VERIFY UT_VERIFY
+
+
+#endif
+
+
+
+
+
+
+
+
+
+//	Default implementation
+//	====================================================================================================================
 
 
 

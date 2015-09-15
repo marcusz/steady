@@ -30,7 +30,9 @@ int main(int argc, const char * argv[])
 {
 	TDefaultRuntime runtime("");
 	SetRuntime(&runtime);
+#if CPP_EXTENSION__UNIT_TESTS_ON
 	run_tests();
+#endif
 
 	try {
 		TRACE("Hello, World 3!");

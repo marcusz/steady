@@ -18,6 +18,7 @@ template <class T>
 struct array {
 };
 
+static const bool kCheckInvariant = false;
 
 
 /**
@@ -31,10 +32,12 @@ Thread safe
 Hash-consing for global deduplication
 */
 
-static const size_t kBranchingFactor = 4;
-static const size_t kBranchingFactorMask = 0x3;
-static const size_t kBranchingFactorShift = 2;
-static const size_t kBranchingFactorAntiMask = 0xffffffff - kBranchingFactorMask;
+
+static const int kBranchingFactorShift = 2;
+
+static const int kBranchingFactor = 1 << kBranchingFactorShift;
+static const size_t kBranchingFactorMask = (kBranchingFactor - 1);
+
 
 
 template <typename T>
@@ -426,7 +429,7 @@ struct NodeRef {
 			return kLeafNode;
 		}
 		else{
-			ASSERT(false);
+			ASSERT_UNREACHABLE;
 		}
 	}
 
