@@ -15,24 +15,22 @@
 #include "cpp_extension.h"
 
 
-//	Change to get different branching factors. Number of bits per inode.
+//	Change kBranchingFactorShift to get different branching factors. Number of bits per inode.
 static const int kBranchingFactorShift = 3;
 
 static const int kBranchingFactor = 1 << kBranchingFactorShift;
 static const size_t kBranchingFactorMask = (kBranchingFactor - 1);
 
-
-
 template <typename T> struct NodeRef;
 template <typename T> struct INode;
 template <typename T> struct LeafNode;
-
 
 enum NodeType {
 	kNullNode = 4,
 	kInode,
 	kLeafNode
 };
+
 
 ////////////////////////////////////////////		NodeRef<T>
 
@@ -44,167 +42,37 @@ enum NodeType {
 
 template <typename T>
 struct NodeRef {
-	public: NodeRef() :
-		_inode(nullptr),
-		_leaf(nullptr)
-	{
-		ASSERT(check_invariant());
-	}
+	public: NodeRef();
 
 	//	Will assume ownership of the input node - caller must not delete it after call returns.
 	//	Adds ref.
 	//	node == nullptr => kNullNode
-	public: NodeRef(INode<T>* node) :
-		_inode(nullptr),
-		_leaf(nullptr)
-	{
-		if(node != nullptr){
-			ASSERT(node->check_invariant());
-			ASSERT(node->_rc >= 0);
-
-			_inode = node;
-			_inode->_rc++;
-		}
-
-		ASSERT(check_invariant());
-	}
+	public: NodeRef(INode<T>* node);
 
 	//	Will assume ownership of the input node - caller must not delete it after call returns.
 	//	Adds ref.
 	//	node == nullptr => kNullNode
-	public: NodeRef(LeafNode<T>* node) :
-		_inode(nullptr),
-		_leaf(nullptr)
-	{
-		if(node != nullptr){
-			ASSERT(node->check_invariant());
-			ASSERT(node->_rc >= 0);
-
-			_leaf = node;
-			_leaf->_rc++;
-		}
-
-		ASSERT(check_invariant());
-	}
+	public: NodeRef(LeafNode<T>* node);
 
 	//	Uses reference counting to share all state.
-	public: NodeRef(const NodeRef<T>& ref) :
-		_inode(nullptr),
-		_leaf(nullptr)
-	{
-		ASSERT(ref.check_invariant());
+	public: NodeRef(const NodeRef<T>& ref);
 
-		if(ref.GetType() == kNullNode){
-		}
-		else if(ref.GetType() == kInode){
-			_inode = ref._inode;
-			_inode->_rc++;
-		}
-		else if(ref.GetType() == kLeafNode){
-			_leaf = ref._leaf;
-			_leaf->_rc++;
-		}
-		else{
-			ASSERT(false);
-		}
-
-		ASSERT(check_invariant());
-	}
-
-	public: ~NodeRef(){
-		ASSERT(check_invariant());
-
-		if(GetType() == kNullNode){
-		}
-		else if(GetType() == kInode){
-			_inode->_rc--;
-			if(_inode->_rc == 0){
-				delete _inode;
-				_inode = nullptr;
-			}
-		}
-		else if(GetType() == kLeafNode){
-			_leaf->_rc--;
-			if(_leaf->_rc == 0){
-				delete _leaf;
-				_leaf = nullptr;
-			}
-		}
-		else{
-			ASSERT(false);
-		}
-	}
+	public: ~NodeRef();
 
 	public: bool check_invariant() const;
-/*
-	public: bool check_invariant() const {
-		ASSERT(_inode == nullptr || _leaf == nullptr);
-
-		if(_inode != nullptr){
-			ASSERT(_inode->check_invariant());
-			ASSERT(_inode->_rc > 0);
-		}
-		else if(_leaf != nullptr){
-			ASSERT(_leaf->check_invariant());
-			ASSERT(_leaf->_rc > 0);
-		}
-		return true;
-	}
-*/
-
-	public: void swap(NodeRef<T>& other){
-		ASSERT(check_invariant());
-		ASSERT(other.check_invariant());
-
-		std::swap(_inode, other._inode);
-		std::swap(_leaf, other._leaf);
-
-		ASSERT(check_invariant());
-		ASSERT(other.check_invariant());
-	}
-
-	public: NodeRef<T>& operator=(const NodeRef<T>& other){
-		ASSERT(check_invariant());
-		ASSERT(other.check_invariant());
-
-		NodeRef<T> temp(other);
-
-		temp.swap(*this);
-
-		ASSERT(check_invariant());
-		ASSERT(other.check_invariant());
-		return *this;
-	}
+	public: void swap(NodeRef<T>& other);
+	public: NodeRef<T>& operator=(const NodeRef<T>& other);
 	
 
 	///////////////////////////////////////		Internals
-
-
-	public: NodeType GetType() const {
-		ASSERT(_inode == nullptr || _leaf == nullptr);
-
-		if(_inode == nullptr && _leaf == nullptr){
-			return kNullNode;
-		}
-		else if(_inode != nullptr){
-			return kInode;
-		}
-		else if(_leaf != nullptr){
-			return kLeafNode;
-		}
-		else{
-			ASSERT_UNREACHABLE;
-		}
-	}
+	public: NodeType GetType() const;
 
 
 	///////////////////////////////////////		State
-		public: INode<T>* _inode;
-		public: LeafNode<T>* _leaf;
+
+	public: INode<T>* _inode;
+	public: LeafNode<T>* _leaf;
 };
-
-
-
 
 
 
@@ -245,10 +113,11 @@ class steady_vector {
 
 	public: std::vector<T> to_vec() const;
 
-	public: void trace_internals() const;
 
 
 	///////////////////////////////////////		Internals
+
+	public: void trace_internals() const;
 
 	public: const NodeRef<T>& GetRoot() const{
 		return _root;
@@ -258,8 +127,9 @@ class steady_vector {
 
 
 	///////////////////////////////////////		State
-		private: NodeRef<T> _root;
-		private: std::size_t _size;
+
+	private: NodeRef<T> _root;
+	private: std::size_t _size;
 };
 
 	

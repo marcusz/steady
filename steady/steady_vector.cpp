@@ -272,6 +272,96 @@ struct INode {
 
 
 
+
+template <typename T>
+NodeRef<T>::NodeRef() :
+	_inode(nullptr),
+	_leaf(nullptr)
+{
+	ASSERT(check_invariant());
+}
+
+template <typename T>
+NodeRef<T>::NodeRef(INode<T>* node) :
+	_inode(nullptr),
+	_leaf(nullptr)
+{
+	if(node != nullptr){
+		ASSERT(node->check_invariant());
+		ASSERT(node->_rc >= 0);
+
+		_inode = node;
+		_inode->_rc++;
+	}
+
+	ASSERT(check_invariant());
+}
+
+template <typename T>
+NodeRef<T>::NodeRef(LeafNode<T>* node) :
+	_inode(nullptr),
+	_leaf(nullptr)
+{
+	if(node != nullptr){
+		ASSERT(node->check_invariant());
+		ASSERT(node->_rc >= 0);
+
+		_leaf = node;
+		_leaf->_rc++;
+	}
+
+	ASSERT(check_invariant());
+}
+
+template <typename T>
+NodeRef<T>::NodeRef(const NodeRef<T>& ref) :
+	_inode(nullptr),
+	_leaf(nullptr)
+{
+	ASSERT(ref.check_invariant());
+
+	if(ref.GetType() == kNullNode){
+	}
+	else if(ref.GetType() == kInode){
+		_inode = ref._inode;
+		_inode->_rc++;
+	}
+	else if(ref.GetType() == kLeafNode){
+		_leaf = ref._leaf;
+		_leaf->_rc++;
+	}
+	else{
+		ASSERT(false);
+	}
+
+	ASSERT(check_invariant());
+}
+
+template <typename T>
+NodeRef<T>::~NodeRef(){
+	ASSERT(check_invariant());
+
+	if(GetType() == kNullNode){
+	}
+	else if(GetType() == kInode){
+		_inode->_rc--;
+		if(_inode->_rc == 0){
+			delete _inode;
+			_inode = nullptr;
+		}
+	}
+	else if(GetType() == kLeafNode){
+		_leaf->_rc--;
+		if(_leaf->_rc == 0){
+			delete _leaf;
+			_leaf = nullptr;
+		}
+	}
+	else{
+		ASSERT(false);
+	}
+}
+
 template <typename T>
 bool NodeRef<T>::check_invariant() const {
 	ASSERT(_inode == nullptr || _leaf == nullptr);
@@ -285,6 +375,50 @@ bool NodeRef<T>::check_invariant() const {
 		ASSERT(_leaf->_rc > 0);
 	}
 	return true;
+}
+
+template <typename T>
+void NodeRef<T>::swap(NodeRef<T>& other){
+	ASSERT(check_invariant());
+	ASSERT(other.check_invariant());
+
+	std::swap(_inode, other._inode);
+	std::swap(_leaf, other._leaf);
+
+	ASSERT(check_invariant());
+	ASSERT(other.check_invariant());
+}
+
+template <typename T>
+NodeRef<T>& NodeRef<T>::operator=(const NodeRef<T>& other){
+	ASSERT(check_invariant());
+	ASSERT(other.check_invariant());
+
+	NodeRef<T> temp(other);
+
+	temp.swap(*this);
+
+	ASSERT(check_invariant());
+	ASSERT(other.check_invariant());
+	return *this;
+}
+
+template <typename T>
+NodeType NodeRef<T>::GetType() const {
+	ASSERT(_inode == nullptr || _leaf == nullptr);
+
+	if(_inode == nullptr && _leaf == nullptr){
+		return kNullNode;
+	}
+	else if(_inode != nullptr){
+		return kInode;
+	}
+	else if(_leaf != nullptr){
+		return kLeafNode;
+	}
+	else{
+		ASSERT_UNREACHABLE;
+	}
 }
 
 
