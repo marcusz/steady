@@ -10,15 +10,40 @@
 
 #include <algorithm>
 
+/*
+NOW
+====================================================================================================================
+pop_back()
 
-//??? Exception safety pls!
 
-//### Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in 
-//??? Path copying requires 31 * 6 RC-bumps!
-//??? Test break for branch factor != 4!!! Tests must find problems with 32.
-//	### Support different branch factors per instance of steady_vector<T>? BF 2 is great for modification, bad for lookup.
-//	### Support holes = allow using for ideal hash.
-//	### Use placement-now in leaf nodes to avoid default-constructing all leaf node items.
+NEXT
+====================================================================================================================
+###	operator== and !=
+
+
+
+first()
+rest()
+
+
+SOMEDAY
+====================================================================================================================
+??? Exception safety pls!
+
+??? Path copying requires 31 * 6 RC-bumps!
+
+### Use placement-now in leaf nodes to avoid default-constructing all leaf node items.
+
+### Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
+
+### Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
+
+### Thread safe
+
+### Support different branch factors per instance of steady_vector<T>? BF 2 is great for modification, bad for lookup.
+
+### Support holes = allow using for ideal hash.
+*/
 
 
 template <class T>
@@ -438,6 +463,21 @@ steady_vector<T> steady_vector<T>::push_back(const T& value) const{
 }
 
 
+/*
+	Correct but inefficient.
+*/
+template <class T>
+steady_vector<T> steady_vector<T>::pop_back() const{
+	ASSERT(check_invariant());
+	ASSERT(_size > 0);
+
+	const auto temp = to_vec();
+	const auto result = steady_vector<T>(&temp[0], _size - 1);
+	return result;
+}
+
+
+
 template <class T>
 steady_vector<T> steady_vector<T>::assoc(size_t index, const T& value) const{
 	ASSERT(check_invariant());
@@ -658,11 +698,11 @@ UNIT_TEST("", "MakeManualVectorWith1()", "", "correct nodes"){
 
 	const auto a = MakeManualVectorWith1();
 	TEST_VERIFY(a.size() == 1);
-	TEST_VERIFY(a._root.GetType() == kLeafNode);
-	TEST_VERIFY(a._root._leaf->_rc == 1);
-	TEST_VERIFY(a._root._leaf->_values[0] == 7);
+	TEST_VERIFY(a.GetRoot().GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot()._leaf->_rc == 1);
+	TEST_VERIFY(a.GetRoot()._leaf->_values[0] == 7);
 	for(int i = 1 ; i < kBranchingFactor ; i++){
-		TEST_VERIFY(a._root._leaf->_values[i] == 0);
+		TEST_VERIFY(a.GetRoot()._leaf->_values[i] == 0);
 	}
 }
 
@@ -679,12 +719,12 @@ UNIT_TEST("", "MakeManualVectorWith2()", "", "correct nodes"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWith2();
 	TEST_VERIFY(a.size() == 2);
-	TEST_VERIFY(a._root.GetType() == kLeafNode);
-	TEST_VERIFY(a._root._leaf->_rc == 1);
-	TEST_VERIFY(a._root._leaf->_values[0] == 7);
-	TEST_VERIFY(a._root._leaf->_values[1] == 8);
-	TEST_VERIFY(a._root._leaf->_values[2] == 0);
-	TEST_VERIFY(a._root._leaf->_values[3] == 0);
+	TEST_VERIFY(a.GetRoot().GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot()._leaf->_rc == 1);
+	TEST_VERIFY(a.GetRoot()._leaf->_values[0] == 7);
+	TEST_VERIFY(a.GetRoot()._leaf->_values[1] == 8);
+	TEST_VERIFY(a.GetRoot()._leaf->_values[2] == 0);
+	TEST_VERIFY(a.GetRoot()._leaf->_values[3] == 0);
 }
 
 
@@ -705,17 +745,17 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorPlus1()", "", "correct nodes"){
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	TEST_VERIFY(a.size() == kBranchingFactor + 1);
 
-	TEST_VERIFY(a._root.GetType() == kInode);
-	TEST_VERIFY(a._root._inode->_rc == 1);
-	TEST_VERIFY(a._root._inode->GetChildCountSkipNulls() == 2);
-	TEST_VERIFY(a._root._inode->GetChild(0).GetType() == kLeafNode);
-	TEST_VERIFY(a._root._inode->GetChild(1).GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot().GetType() == kInode);
+	TEST_VERIFY(a.GetRoot()._inode->_rc == 1);
+	TEST_VERIFY(a.GetRoot()._inode->GetChildCountSkipNulls() == 2);
+	TEST_VERIFY(a.GetRoot()._inode->GetChild(0).GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot()._inode->GetChild(1).GetType() == kLeafNode);
 
-	const auto leaf0 = a._root._inode->GetChildLeafNode(0);
+	const auto leaf0 = a.GetRoot()._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
 	TEST_VERIFY(leaf0->_values == GenerateNumbers(7 + kBranchingFactor * 0, kBranchingFactor, kBranchingFactor));
 
-	const auto leaf1 = a._root._inode->GetChildLeafNode(1);
+	const auto leaf1 = a.GetRoot()._inode->GetChildLeafNode(1);
 	TEST_VERIFY(leaf1->_rc == 1);
 	TEST_VERIFY(leaf1->_values == GenerateNumbers(7 + kBranchingFactor * 1, 1, kBranchingFactor));
 }
@@ -745,7 +785,7 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct node
 	const auto a = MakeManualVectorWithBranchFactorSquarePlus1();
 	TEST_VERIFY(a.size() == kBranchingFactor * kBranchingFactor + 1);
 
-	NodeRef<int> rootINode = a._root;
+	NodeRef<int> rootINode = a.GetRoot();
 	TEST_VERIFY(rootINode.GetType() == kInode);
 	TEST_VERIFY(rootINode._inode->_rc == 2);
 	TEST_VERIFY(rootINode._inode->GetChildCountSkipNulls() == 2);
@@ -993,6 +1033,18 @@ UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to
 	a.trace_internals();
 }
 
+////////////////////////////////////////////		steady_vector::pop_back()
+
+
+UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector"){
+	TestFixture<int> f;
+	const auto data = GenerateNumbers(4, 50, 50);
+	const auto data2 = std::vector<int>(&data[0], &data[data.size() - 1]);
+	const auto a = steady_vector<int>(data);
+	const auto b = a.pop_back();
+	TEST_VERIFY(b.to_vec() == data2);
+}
+
 
 
 ////////////////////////////////////////////		steady_vector::size()
@@ -1126,7 +1178,7 @@ UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 items",
 
 	TEST_VERIFY(a.to_vec() == data);
 	TEST_VERIFY(b.to_vec() == data);
-	TEST_VERIFY(a._root._leaf == b._root._leaf);
+	TEST_VERIFY(a.GetRoot()._leaf == b.GetRoot()._leaf);
 }
 
 
@@ -1157,16 +1209,8 @@ UNIT_TEST("steady_vector", "operator=()", "7 items", "identical, sharing root"){
 
 	TEST_VERIFY(a.to_vec() == data);
 	TEST_VERIFY(b.to_vec() == data);
-	TEST_VERIFY(a._root._leaf == b._root._leaf);
+	TEST_VERIFY(a.GetRoot()._leaf == b.GetRoot()._leaf);
 }
 
 
-
-
-
-
-
-
-
-//### test all member functions of steady_vector!
 

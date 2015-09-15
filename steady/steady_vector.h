@@ -9,30 +9,12 @@
 #ifndef __steady__steady_vector__
 #define __steady__steady_vector__
 
-#include <cstddef>
 #include <initializer_list>
 #include <vector>
 #include "cpp_extension.h"
 
-template <class T>
-struct array {
-};
 
-static const bool kCheckInvariant = false;
-
-
-/**
-Persistent
-Templetized
-UT
-Ranges, not iterators
-Strong exception safety
-Thread safe
-
-Hash-consing for global deduplication
-*/
-
-
+//	Change to get different branching factors. Number of bits per inode.
 static const int kBranchingFactorShift = 3;
 
 static const int kBranchingFactor = 1 << kBranchingFactorShift;
@@ -168,13 +150,12 @@ namespace {
 
 /*
 	An INode has these states:
-		32 iNode pointers or
-		32 leaf node pointers or
+		full set of iNode pointers or
+		full set of leaf node pointers or
 		empty vector.
 
 	You cannot mix inode and leaf nodes in the same INode.
 	INode pointers and leaf node pointers can be null, but the nulls are always at the end of the arrays.
-
 	Sets its internal RC to 0 and never changes it.
 */
 
@@ -412,7 +393,6 @@ struct NodeRef {
 	}
 	
 
-
 	///////////////////////////////////////		Internals
 
 
@@ -432,7 +412,6 @@ struct NodeRef {
 			ASSERT_UNREACHABLE;
 		}
 	}
-
 
 
 	///////////////////////////////////////		State
@@ -460,10 +439,13 @@ class steady_vector {
 	public: steady_vector& operator=(const steady_vector& rhs);
 	public: void swap(steady_vector& other);
 
-	// ###	operator== and !=
-
 	public: steady_vector assoc(size_t index, const T& value) const;
 	public: steady_vector push_back(const T& value) const;
+
+	public: steady_vector pop_back() const;
+
+//	public: T front() const;
+
 	public: std::size_t size() const;
 	public: bool empty() const{
 		return size() == 0;
@@ -478,13 +460,16 @@ class steady_vector {
 
 	///////////////////////////////////////		Internals
 
+	public: const NodeRef<T>& GetRoot() const{
+		return _root;
+	}
 	public: steady_vector(NodeRef<T> root, std::size_t size);
 
 
 
 	///////////////////////////////////////		State
-		public: NodeRef<T> _root;
-		public: std::size_t _size;
+		private: NodeRef<T> _root;
+		private: std::size_t _size;
 };
 
 	
