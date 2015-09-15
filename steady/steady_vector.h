@@ -453,7 +453,6 @@ class steady_vector {
 	public: steady_vector(const T entries[], size_t count);
 	public: steady_vector(std::initializer_list<T> args);
 
-	//public: steady_vector(T entries[], std::size_t count);
 	public: ~steady_vector();
 	public: bool check_invariant() const;
 
@@ -463,18 +462,14 @@ class steady_vector {
 
 	// ###	operator== and !=
 
-	public: steady_vector push_back(const T& value) const;
 	public: steady_vector assoc(size_t index, const T& value) const;
+	public: steady_vector push_back(const T& value) const;
 	public: std::size_t size() const;
 	public: bool empty() const{
 		return size() == 0;
 	}
 
-	public: T operator[](const std::size_t index) const{
-		return get_at(index);
-	}
-
-	public: T get_at(const std::size_t index) const;
+	public: T operator[](const std::size_t index) const;
 
 	public: std::vector<T> to_vec() const;
 
