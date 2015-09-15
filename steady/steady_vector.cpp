@@ -486,23 +486,27 @@ std::vector<T> steady_vector<T>::to_vec() const{
 
 namespace {
 	template <class T>
-	void trace_node(const NodeRef<T>& node){
+	void trace_node(const std::string& prefix, const NodeRef<T>& node){
 		if(node.GetType() == kNullNode){
-			TRACE_SS("<null>");
+			TRACE_SS(prefix << "<null>");
 		}
 		else if(node.GetType() == kInode){
-			TRACE_SS("<inode> RC: " << node._inode->_rc);
+			TRACE_SS(prefix << "<inode> RC: " << node._inode->_rc);
 			SCOPED_INDENT();
+			int index = 0;
 			for(auto i: node._inode->GetChildrenWithNulls()){
-				trace_node(i);
+				trace_node("#" + std::to_string(index) + "\t", i);
+				index++;
 			}
 		}
 		else if(node.GetType() == kLeafNode){
-			TRACE_SS("<leaf> RC: " << node._leaf->_rc);
+			TRACE_SS(prefix << "<leaf> RC: " << node._leaf->_rc);
 			SCOPED_INDENT();
+			int index = 0;
 			for(auto i: node._leaf->_values){
-				TRACE_SS(i);
+				TRACE_SS("#" << std::to_string(index) << "\t" << i);
 				(void)i;
+				index++;
 			}
 		}
 		else{
@@ -520,7 +524,7 @@ void steady_vector<T>::trace_internals() const{
 		"total inodes: " << INode<T>::_debug_count << ", "
 		"total leaf nodes: " << LeafNode<T>::_debug_count);
 
-	trace_node(_root);
+	trace_node("", _root);
 }
 
 
@@ -529,6 +533,20 @@ void steady_vector<T>::trace_internals() const{
 
 
 ////////////////////////////////////////////			Unit tests
+
+
+
+
+//static void ThisFunctioIsUnused();
+
+namespace {
+struct TTEST {
+	static void ThisFunctioIsUnused(){
+	}
+};
+}
+
+
 
 
 void vector_test(const std::vector<int>& v){

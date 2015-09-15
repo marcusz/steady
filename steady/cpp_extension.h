@@ -373,9 +373,9 @@ void run_tests();
 
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
 #define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
-	static void PP_UNIQUE_LABEL(fun_)(); \
-	static TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(fun_)); \
-	static void PP_UNIQUE_LABEL(fun_)()
+	static void PP_UNIQUE_LABEL(cppext_unit_test_)(); \
+	static TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
+	static void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
 //### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
 #define UT_VERIFY(exp) if(exp){}else{ OnUnitTestFailedHook(::GetRuntime(), TSourceLocation(__FILE__, __LINE__), PP_STRING(exp)); }
@@ -395,7 +395,7 @@ void run_tests();
 
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
 #define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
-	static void PP_UNIQUE_LABEL(fun_)()
+	void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
 #define UT_VERIFY(exp)
 #define TEST_VERIFY UT_VERIFY

@@ -33,7 +33,7 @@ Hash-consing for global deduplication
 */
 
 
-static const int kBranchingFactorShift = 2;
+static const int kBranchingFactorShift = 3;
 
 static const int kBranchingFactor = 1 << kBranchingFactorShift;
 static const size_t kBranchingFactorMask = (kBranchingFactor - 1);
