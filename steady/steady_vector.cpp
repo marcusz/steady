@@ -21,6 +21,7 @@ NEXT
 ====================================================================================================================
 ### optimize operator==()
 
+Improve tree validation.
 
 first()
 rest()
@@ -28,6 +29,8 @@ rest()
 
 SOMEDAY
 ====================================================================================================================
+Store shift in steady_vector to avoid recomputing it all the time.
+
 subvec - no trimming = very fast.
 
 assoc at end => append
@@ -528,24 +531,24 @@ namespace {
 
 
 	template <class T>
-	NodeRef<T> find_leaf(const NodeRef<T>& tree, size_t size, size_t index){
+	NodeRef<T> find_leaf_node(const NodeRef<T>& tree, size_t size, size_t index){
 		ASSERT(tree_check_invariant(tree, size));
 		ASSERT(index < size);
 
 		auto shift = VectorSizeToShift(size);
 
-		NodeRef<T> node = tree;
+		NodeRef<T> nodeIt = tree;
 
 		//	Traverse all inodes.
 		while(shift > 0){
 			size_t slotIndex = (index >> shift) & kBranchingFactorMask;
-			node = node._inode->GetChild(slotIndex);
+			nodeIt = nodeIt._inode->GetChild(slotIndex);
 			shift -= kBranchingFactorShift;
 		}
 
 		ASSERT(shift == 0);
-		ASSERT(node.GetType() == kLeafNode);
-		return node;
+		ASSERT(nodeIt.GetType() == kLeafNode);
+		return nodeIt;
 	}
 
 
@@ -562,7 +565,7 @@ namespace {
 	NodeRef<T> modify_existing_value(const NodeRef<T>& node, int shift, size_t index, const T& value){
 		ASSERT(node.GetType() == kInode || node.GetType() == kLeafNode);
 
-		size_t slotIndex = (index >> shift) & kBranchingFactorMask;
+		const size_t slotIndex = (index >> shift) & kBranchingFactorMask;
 		if(shift == 0){
 			ASSERT(node.GetType() == kLeafNode);
 
@@ -574,12 +577,12 @@ namespace {
 		else{
 			ASSERT(node.GetType() == kInode);
 
-			auto child = node._inode->GetChild(slotIndex);
+			const auto child = node._inode->GetChild(slotIndex);
 			auto childCopy = modify_existing_value(child, shift - kBranchingFactorShift, index, value);
 
 			auto children = node._inode->GetChildrenWithNulls();
 			children[slotIndex] = childCopy;
-			NodeRef<T> copy = NodeRef<T>(new INode<T>(children));
+			auto copy = MakeINodeFromArray(children);
 			return copy;
 		}
 	}
@@ -869,7 +872,7 @@ T steady_vector<T>::operator[](const std::size_t index) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	const auto leaf = find_leaf(_root, _size, index);
+	const auto leaf = find_leaf_node(_root, _size, index);
 	const auto slotIndex = index & kBranchingFactorMask;
 
 	ASSERT(slotIndex < leaf._leaf->_values.size());
