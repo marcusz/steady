@@ -16,61 +16,58 @@
 
 namespace steady {
 
-	//	Change kBranchingFactorShift to get different branching factors. Number of bits per inode.
-	static const int kBranchingFactorShift = 3;
+	//	Change BRANCHING_FACTOR_SHIFT to get different branching factors. Number of bits per inode.
+	static const int BRANCHING_FACTOR_SHIFT = 3;
 
 	namespace internals {
-		static const int kBranchingFactor = 1 << kBranchingFactorShift;
-		static const size_t kBranchingFactorMask = (kBranchingFactor - 1);
+		template <typename T> struct node_ref;
+		template <typename T> struct inode;
+		template <typename T> struct leaf_node;
 
-		template <typename T> struct NodeRef;
-		template <typename T> struct INode;
-		template <typename T> struct LeafNode;
-
-		enum class NodeType {
-			kNullNode = 4,
-			kInode,
-			kLeafNode
+		enum class node_type {
+			null_node = 4,
+			inode,
+			leaf_node
 		};
 
 
-		////////////////////////////////////////////		NodeRef<T>
+		////////////////////////////////////////////		node_ref<T>
 
 		/*
-			Safe, reference counted handle that wraps either an INode, a LeadNode or null.
+			Safe, reference counted handle that wraps either an inode, a LeadNode or null.
 		*/
 		template <typename T>
-		struct NodeRef {
-			public: NodeRef();
+		struct node_ref {
+			public: node_ref();
 
 			//	Will assume ownership of the input node - caller must not delete it after call returns.
 			//	Adds ref.
-			//	node == nullptr => kNullNode
-			public: NodeRef(INode<T>* node);
+			//	node == nullptr => null_node
+			public: node_ref(inode<T>* node);
 
 			//	Will assume ownership of the input node - caller must not delete it after call returns.
 			//	Adds ref.
-			//	node == nullptr => kNullNode
-			public: NodeRef(LeafNode<T>* node);
+			//	node == nullptr => null_node
+			public: node_ref(leaf_node<T>* node);
 
 			//	Uses reference counting to share all state.
-			public: NodeRef(const NodeRef<T>& ref);
+			public: node_ref(const node_ref<T>& ref);
 
-			public: ~NodeRef();
+			public: ~node_ref();
 
 			public: bool check_invariant() const;
-			public: void swap(NodeRef<T>& other);
-			public: NodeRef<T>& operator=(const NodeRef<T>& other);
+			public: void swap(node_ref<T>& rhs);
+			public: node_ref<T>& operator=(const node_ref<T>& rhs);
 			
 
 			///////////////////////////////////////		Internals
-			public: NodeType GetType() const;
+			public: node_type get_type() const;
 
 
 			///////////////////////////////////////		State
 
-			public: INode<T>* _inode;
-			public: LeafNode<T>* _leaf;
+			public: inode<T>* _inode;
+			public: leaf_node<T>* _leaf;
 		};
 
 	}
@@ -89,6 +86,8 @@ namespace steady {
 
 
 	Based on Clojure's vector.
+
+	NOTICE: if T has member functions that throws exception, so will steady_vector.
 */
 
 
@@ -261,16 +260,16 @@ class steady_vector {
 	*/
 	public: void trace_internals() const;
 
-	public: const internals::NodeRef<T>& GetRoot() const{
+	public: const internals::node_ref<T>& get_root() const{
 		return _root;
 	}
-	public: steady_vector(internals::NodeRef<T> root, std::size_t size);
+	public: steady_vector(internals::node_ref<T> root, std::size_t size);
 
 
 
 	///////////////////////////////////////		State
 
-	private: internals::NodeRef<T> _root;
+	private: internals::node_ref<T> _root;
 	private: std::size_t _size;
 };
 
