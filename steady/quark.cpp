@@ -6,7 +6,7 @@
 //  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
 //
 
-#include "cpp_extension.h"
+#include "quark.h"
 
 #include <iostream>
 #include <cmath>

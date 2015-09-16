@@ -6,8 +6,8 @@
 //  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
 //
 
-#ifndef steady_cpp_extension_h
-#define steady_cpp_extension_h
+#ifndef quark_h
+#define quark_h
 
 #include <cassert>
 #include <vector>

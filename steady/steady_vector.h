@@ -12,7 +12,7 @@
 #include <initializer_list>
 #include <atomic>
 #include <vector>
-#include "cpp_extension.h"
+#include "quark.h"
 
 namespace steady {
 

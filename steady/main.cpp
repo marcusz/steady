@@ -7,12 +7,9 @@
 //
 
 
-#include "cpp_extension.h"
 #include "steady_vector.h"
 
 #include <iostream>
-
-
 
 
 
@@ -25,14 +22,10 @@ void Example(){
 	ASSERT(a.size() == 3);
 }
 
-
-
-
-
-int main(int argc, const char * argv[])
-{
+int main(int argc, const char * argv[]){
 	TDefaultRuntime runtime("");
 	SetRuntime(&runtime);
+
 #if CPP_EXTENSION__UNIT_TESTS_ON
 	run_tests();
 #endif
