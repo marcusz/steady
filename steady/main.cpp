@@ -15,7 +15,7 @@
 
 void Example(){
 	{
-		steady::steady_vector<int> a;
+		steady::vector<int> a;
 		a = a.push_back(3);
 		a = a.push_back(8);
 		a = a.push_back(11);
@@ -24,6 +24,20 @@ void Example(){
 	}
 
 	{
+		const steady::vector<int> a{ 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+		const auto b = a + a + a + a + a + a + a + a + a + a;
+		QUARK_ASSERT(b.size() == 100);
+
+/*
+		const auto c = b + b + b + b + b + b + b + b + b + b;
+		QUARK_ASSERT(c.size() == 1000);
+
+		const auto d = c + c + c + c + c + c + c + c + c + c;
+		QUARK_ASSERT(d.size() == 10000);
+
+		const auto e = d + d + d + d + d + d + d + d + d + d;
+		QUARK_ASSERT(e.size() == 10000);
+*/
 	}
 }
 

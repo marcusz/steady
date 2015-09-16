@@ -1,6 +1,6 @@
 
-#ifndef __steady__steady_vector__
-#define __steady__steady_vector__
+#ifndef __steady__vector__
+#define __steady__vector__
 
 #include <initializer_list>
 #include <atomic>
@@ -11,6 +11,8 @@ namespace steady {
 
 	//	Change BRANCHING_FACTOR_SHIFT to get different branching factors. Number of bits per inode.
 	static const int BRANCHING_FACTOR_SHIFT = 2;
+
+
 
 	namespace internals {
 		template <typename T> struct node_ref;
@@ -63,7 +65,7 @@ namespace steady {
 	}
 
 
-////////////////////////////////////////////		steady_vector
+////////////////////////////////////////////		vector
 
 /*
 	Persistent vector class.
@@ -77,18 +79,18 @@ namespace steady {
 
 	Based on Clojure's vector.
 
-	NOTICE: if T has member functions that throws exception, so will steady_vector.
+	NOTICE: if T has member functions that throws exception, so will vector.
 */
 
 
 template <class T>
-class steady_vector {
+class vector {
 	/*
 		Makes empty vector.
 		No memory allocation.
 		O(1)
 	*/
-	public: steady_vector();
+	public: vector();
 
 	/*
 		Makes vector containing values from a std::vector<>.
@@ -97,7 +99,7 @@ class steady_vector {
 		values: zero -> many values.
 		this: on exit this holds the new vector
 	*/
-	public: steady_vector(const std::vector<T>& values);
+	public: vector(const std::vector<T>& values);
 
 	/*
 		Makes vector containing _count_ values from _values_.
@@ -108,23 +110,23 @@ class steady_vector {
 		count: >= 0
 		this: on exit this holds the new vector
 	*/
-	public: steady_vector(const T values[], size_t count);
+	public: vector(const T values[], size_t count);
 
 	/*
 		C++11 initializer-list constructor. Allows you to write
-			const steady_vector<int>({ 1, 2, 3 });
+			const vector<int>({ 1, 2, 3 });
 
 		Allocates memory.
 
 		args: a C++11 initializer list object that specifies the values for the new vector
 		this: on exit this holds the new vector
 	*/
-	public: steady_vector(std::initializer_list<T> args);
+	public: vector(std::initializer_list<T> args);
 
 	/*
 		no-throw
 	*/
-	public: ~steady_vector();
+	public: ~vector();
 
 	/*
 		Development feature: validates the internal state of the vector and calls ASSERT on defects.
@@ -145,7 +147,7 @@ class steady_vector {
 		this: on exit, this will hold a copy of _rhs_
 		rhs: vector to copy.
 	*/
-	public: steady_vector(const steady_vector& rhs);
+	public: vector(const vector& rhs);
 
 	/*
 		Same as copy-constructor.
@@ -157,7 +159,7 @@ class steady_vector {
 		this: on entry this is the destination vector, on exit, it will hold _rhs_.
 		rhs: source vector
 	*/
-	public: steady_vector& operator=(const steady_vector& rhs);
+	public: vector& operator=(const vector& rhs);
 
 	/*
 		The variable holding your vector will be changed to hold the vector specified by _rhs_ and vice versa.
@@ -168,7 +170,7 @@ class steady_vector {
 		this: on entry this holds vector A, on exit it holds vector B
 		rhs: on entry this holds vector B, on exit it holds vector A
 	*/
-	public: void swap(steady_vector& rhs);
+	public: void swap(vector& rhs);
 
 	/*
 		Store value into the vector
@@ -181,7 +183,7 @@ class steady_vector {
 		value: new value to store
 		return: new copy of the vector with _value_ stored at the _index_.
 	*/
-	public: steady_vector assoc(size_t index, const T& value) const;
+	public: vector assoc(size_t index, const T& value) const;
 
 	/*
 		Append value to the end of the vector, returning a vector with size + 1.
@@ -192,7 +194,7 @@ class steady_vector {
 		value: value to append.
 		return: new copy of the vector, with _value_ tacked to the end. It will be 1 bigger than the input vector.
 	*/
-	public: steady_vector push_back(const T& value) const;
+	public: vector push_back(const T& value) const;
 
 	/*
 		Remove last value in the vector, returning a vector with size - 1.
@@ -200,7 +202,7 @@ class steady_vector {
 		this: must have size() > 0
 		return: new copy of the vector, with the last values removed. It will be 1 smaller than input vector.
 	*/
-	public: steady_vector pop_back() const;
+	public: vector pop_back() const;
 
 	/*
 		Returns true if vectors are equivalent.
@@ -212,8 +214,8 @@ class steady_vector {
 
 		return: true if vectors have the same size and operator==() on every value are true
 	*/
-	public: bool operator==(const steady_vector& rhs) const;
-	public: bool operator!=(const steady_vector& rhs) const{
+	public: bool operator==(const vector& rhs) const;
+	public: bool operator!=(const vector& rhs) const{
 		return !(*this == rhs);
 	}
 
@@ -253,7 +255,7 @@ class steady_vector {
 	public: const internals::node_ref<T>& get_root() const{
 		return _root;
 	}
-	public: steady_vector(internals::node_ref<T> root, std::size_t size);
+	public: vector(internals::node_ref<T> root, std::size_t size);
 
 
 
@@ -264,8 +266,8 @@ class steady_vector {
 };
 
 template <class T>
-steady_vector<T> operator+(const steady_vector<T>& a, const steady_vector<T>& b);
+vector<T> operator+(const vector<T>& a, const vector<T>& b);
 
 }	//	steady
 	
-#endif /* defined(__steady__steady_vector__) */
+#endif /* defined(__steady__vector__) */
