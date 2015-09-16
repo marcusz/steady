@@ -1,10 +1,3 @@
-//
-//  steady_vector.h
-//  steady
-//
-//  Created by Marcus Zetterquist on 2013-11-13.
-//  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
-//
 
 #ifndef __steady__steady_vector__
 #define __steady__steady_vector__
@@ -17,7 +10,7 @@
 namespace steady {
 
 	//	Change BRANCHING_FACTOR_SHIFT to get different branching factors. Number of bits per inode.
-	static const int BRANCHING_FACTOR_SHIFT = 3;
+	static const int BRANCHING_FACTOR_SHIFT = 2;
 
 	namespace internals {
 		template <typename T> struct node_ref;
@@ -33,9 +26,6 @@ namespace steady {
 
 		////////////////////////////////////////////		node_ref<T>
 
-		/*
-			Safe, reference counted handle that wraps either an inode, a LeadNode or null.
-		*/
 		template <typename T>
 		struct node_ref {
 			public: node_ref();
@@ -59,15 +49,15 @@ namespace steady {
 			public: void swap(node_ref<T>& rhs);
 			public: node_ref<T>& operator=(const node_ref<T>& rhs);
 			
-
-			///////////////////////////////////////		Internals
 			public: node_type get_type() const;
-
+			public: const inode<T>* get_inode() const;
+			public: const leaf_node<T>* get_leaf_node() const;
+			public: leaf_node<T>* get_leaf_node();
 
 			///////////////////////////////////////		State
 
-			public: inode<T>* _inode;
-			public: leaf_node<T>* _leaf;
+			private: inode<T>* _inode;
+			public: leaf_node<T>* _leaf_node;
 		};
 
 	}

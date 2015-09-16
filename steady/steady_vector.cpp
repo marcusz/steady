@@ -1,10 +1,3 @@
-//
-//  steady_vector.cpp
-//  steady
-//
-//  Created by Marcus Zetterquist on 2013-11-13.
-//  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
-//
 
 #include "steady_vector.h"
 
@@ -16,16 +9,8 @@
 NOW
 ====================================================================================================================
 ### optimize pop_back()
-
-### QUARK_-prefix and file names.
-
-### Append leaf by leaf.
-
-### Fix namepsace
+### Append leaf by leaf when copying data etc.
 ### Name library
-### clean up cpp_extensions
-### Unify code naming conventions: all lower cases.
-### Write docs on public functions.
 
 
 NEXT
@@ -34,13 +19,11 @@ NEXT
 
 Improve tree validation.
 
-first()
-rest()
+first(),rest(). Add seq?
 
 
 SOMEDAY
 ====================================================================================================================
-
 ### Make memory allocation hookable.
 
 Store shift in steady_vector to avoid recomputing it all the time.
@@ -51,8 +34,7 @@ assoc at end => append
 
 pool nodes?
 
-Over-alloc / reserve nodes?
-
+Over-alloc / reserve nodes like std::vector<>?
 
 ??? Exception safety pls!
 
@@ -67,7 +49,6 @@ Over-alloc / reserve nodes?
 ### Support different branch factors per instance of steady_vector<T>? BF 2 is great for modification, bad for lookup.
 
 ### Support holes = allow using for ideal hash.
-
 */
 
 //	Give QUARK macros shorter names
@@ -98,14 +79,6 @@ namespace internals {
 
 template <class T>
 struct leaf_node {
-	public: leaf_node() :
-		_rc(0),
-		_values(BRANCHING_FACTOR, T{})
-	{
-		_debug_count++;
-		ASSERT(check_invariant());
-	}
-
 	public: leaf_node(const std::array<T, BRANCHING_FACTOR>& values) :
 		_rc(0),
 		_values(values)
@@ -210,14 +183,6 @@ template <class T>
 struct inode {
 	public: typedef std::array<node_ref<T>, BRANCHING_FACTOR> children_t;
 
-
-	public: inode() :
-		_rc(0)
-	{
-		_debug_count++;
-		ASSERT(check_invariant());
-	}
-
 	//	children: 0-32 children, all of the same type. kNullNodes can only appear at end of vector.
 	public: inode(const children_t& children2) :
 		_rc(0),
@@ -266,7 +231,7 @@ struct inode {
 	}
 
 	//	Returns entire array, even if not all items are used.
-	public: children_t get_child_array(){
+	public: children_t get_child_array() const{
 		ASSERT(check_invariant());
 
 		return _children;
@@ -281,12 +246,12 @@ struct inode {
 	}
 
 	//	You can only call this for leaf nodes.
-	public: leaf_node<T>* get_child_as_leaf_node(size_t index){
+	public: const leaf_node<T>* get_child_as_leaf_node(size_t index) const{
 		ASSERT(check_invariant());
 		ASSERT(index < _children.size());
 
 		ASSERT(_children[0].get_type() == node_type::leaf_node);
-		return _children[index]._leaf;
+		return _children[index]._leaf_node;
 	}
 
 
@@ -305,13 +270,14 @@ struct inode {
 ////////////////////////////////////////////		node_ref<T>
 
 
-
-
+/*
+	Safe, reference counted handle that wraps either an inode, a LeadNode or null.
+*/
 
 template <typename T>
 node_ref<T>::node_ref() :
 	_inode(nullptr),
-	_leaf(nullptr)
+	_leaf_node(nullptr)
 {
 	ASSERT(check_invariant());
 }
@@ -319,7 +285,7 @@ node_ref<T>::node_ref() :
 template <typename T>
 node_ref<T>::node_ref(inode<T>* node) :
 	_inode(nullptr),
-	_leaf(nullptr)
+	_leaf_node(nullptr)
 {
 	if(node != nullptr){
 		ASSERT(node->check_invariant());
@@ -335,14 +301,14 @@ node_ref<T>::node_ref(inode<T>* node) :
 template <typename T>
 node_ref<T>::node_ref(leaf_node<T>* node) :
 	_inode(nullptr),
-	_leaf(nullptr)
+	_leaf_node(nullptr)
 {
 	if(node != nullptr){
 		ASSERT(node->check_invariant());
 		ASSERT(node->_rc >= 0);
 
-		_leaf = node;
-		_leaf->_rc++;
+		_leaf_node = node;
+		_leaf_node->_rc++;
 	}
 
 	ASSERT(check_invariant());
@@ -351,7 +317,7 @@ node_ref<T>::node_ref(leaf_node<T>* node) :
 template <typename T>
 node_ref<T>::node_ref(const node_ref<T>& ref) :
 	_inode(nullptr),
-	_leaf(nullptr)
+	_leaf_node(nullptr)
 {
 	ASSERT(ref.check_invariant());
 
@@ -362,8 +328,8 @@ node_ref<T>::node_ref(const node_ref<T>& ref) :
 		_inode->_rc++;
 	}
 	else if(ref.get_type() == node_type::leaf_node){
-		_leaf = ref._leaf;
-		_leaf->_rc++;
+		_leaf_node = ref._leaf_node;
+		_leaf_node->_rc++;
 	}
 	else{
 		ASSERT(false);
@@ -386,10 +352,10 @@ node_ref<T>::~node_ref(){
 		}
 	}
 	else if(get_type() == node_type::leaf_node){
-		_leaf->_rc--;
-		if(_leaf->_rc == 0){
-			delete _leaf;
-			_leaf = nullptr;
+		_leaf_node->_rc--;
+		if(_leaf_node->_rc == 0){
+			delete _leaf_node;
+			_leaf_node = nullptr;
 		}
 	}
 	else{
@@ -399,15 +365,15 @@ node_ref<T>::~node_ref(){
 
 template <typename T>
 bool node_ref<T>::check_invariant() const {
-	ASSERT(_inode == nullptr || _leaf == nullptr);
+	ASSERT(_inode == nullptr || _leaf_node == nullptr);
 
 	if(_inode != nullptr){
 		ASSERT(_inode->check_invariant());
 		ASSERT(_inode->_rc > 0);
 	}
-	else if(_leaf != nullptr){
-		ASSERT(_leaf->check_invariant());
-		ASSERT(_leaf->_rc > 0);
+	else if(_leaf_node != nullptr){
+		ASSERT(_leaf_node->check_invariant());
+		ASSERT(_leaf_node->_rc > 0);
 	}
 	return true;
 }
@@ -418,7 +384,7 @@ void node_ref<T>::swap(node_ref<T>& rhs){
 	ASSERT(rhs.check_invariant());
 
 	std::swap(_inode, rhs._inode);
-	std::swap(_leaf, rhs._leaf);
+	std::swap(_leaf_node, rhs._leaf_node);
 
 	ASSERT(check_invariant());
 	ASSERT(rhs.check_invariant());
@@ -440,15 +406,15 @@ node_ref<T>& node_ref<T>::operator=(const node_ref<T>& rhs){
 
 template <typename T>
 node_type node_ref<T>::get_type() const {
-	ASSERT(_inode == nullptr || _leaf == nullptr);
+	ASSERT(_inode == nullptr || _leaf_node == nullptr);
 
-	if(_inode == nullptr && _leaf == nullptr){
+	if(_inode == nullptr && _leaf_node == nullptr){
 		return node_type::null_node;
 	}
 	else if(_inode != nullptr){
 		return node_type::inode;
 	}
-	else if(_leaf != nullptr){
+	else if(_leaf_node != nullptr){
 		return node_type::leaf_node;
 	}
 	else{
@@ -456,10 +422,29 @@ node_type node_ref<T>::get_type() const {
 	}
 }
 
+template <typename T>
+const inode<T>* node_ref<T>::get_inode() const {
+	ASSERT(check_invariant());
+	ASSERT(get_type() == node_type::inode);
 
+	return _inode;
+}
 
+template <typename T>
+const leaf_node<T>* node_ref<T>::get_leaf_node() const {
+	ASSERT(check_invariant());
+	ASSERT(get_type() == node_type::leaf_node);
 
+	return _leaf_node;
+}
 
+template <typename T>
+leaf_node<T>* node_ref<T>::get_leaf_node() {
+	ASSERT(check_invariant());
+	ASSERT(get_type() == node_type::leaf_node);
+
+	return _leaf_node;
+}
 
 
 
@@ -469,13 +454,11 @@ int inode<T>::_debug_count = 0;
 template <class T>
 int leaf_node<T>::_debug_count = 0;
 
-
 }	//	internals
 
 
 
 using namespace internals;
-
 
 
 
@@ -510,6 +493,23 @@ namespace {
 			return 1 + count_to_depth(leaf_count);
 		}
 	}
+
+	QUARK_UNIT_TEST("", "count_to_depth()", "0", "-1"){
+		VERIFY(count_to_depth(0) == 0);
+
+		VERIFY(count_to_depth(1) == 1);
+		VERIFY(count_to_depth(2) == 1);
+		VERIFY(count_to_depth(3) == 1);
+
+		VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
+		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
+
+		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
+		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
+	}
+
+
+
 
 	/*
 		Return how many steps to shift vector-index to get its *top-level* bits.
@@ -578,7 +578,7 @@ namespace {
 		//	Traverse all inodes.
 		while(shift > 0){
 			size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
-			node_it = node_it._inode->get_child(slot_index);
+			node_it = node_it.get_inode()->get_child(slot_index);
 			shift -= BRANCHING_FACTOR_SHIFT;
 		}
 
@@ -605,18 +605,18 @@ namespace {
 		if(shift == 0){
 			ASSERT(node.get_type() == node_type::leaf_node);
 
-			auto copy = node_ref<T>(new leaf_node<T>(node._leaf->_values));
-			ASSERT(slot_index < copy._leaf->_values.size());
-			copy._leaf->_values[slot_index] = value;
+			auto copy = node_ref<T>(new leaf_node<T>(node.get_leaf_node()->_values));
+			ASSERT(slot_index < copy.get_leaf_node()->_values.size());
+			copy.get_leaf_node()->_values[slot_index] = value;
 			return copy;
 		}
 		else{
 			ASSERT(node.get_type() == node_type::inode);
 
-			const auto child = node._inode->get_child(slot_index);
+			const auto child = node.get_inode()->get_child(slot_index);
 			auto child2 = modify_existing_value(child, shift - BRANCHING_FACTOR_SHIFT, index, value);
 
-			auto children = node._inode->get_child_array();
+			auto children = node.get_inode()->get_child_array();
 			children[slot_index] = child2;
 			auto copy = make_inode_from_array(children);
 			return copy;
@@ -792,7 +792,7 @@ namespace  {
 		ASSERT(append.get_type() == node_type::leaf_node);
 
 		size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
-		auto children = original._inode->get_child_array();
+		auto children = original.get_inode()->get_child_array();
 
 		//	Lowest level inode, pointing to leaf nodes.
 		if(shift == BRANCHING_FACTOR_SHIFT){
@@ -917,8 +917,8 @@ T steady_vector<T>::operator[](const std::size_t index) const{
 	const auto leaf = find_leaf_node(_root, _size, index);
 	const auto slot_index = index & BRANCHING_FACTOR_MASK;
 
-	ASSERT(slot_index < leaf._leaf->_values.size());
-	const T result = leaf._leaf->_values[slot_index];
+	ASSERT(slot_index < leaf.get_leaf_node()->_values.size());
+	const T result = leaf.get_leaf_node()->_values[slot_index];
 	return result;
 }
 
@@ -943,21 +943,21 @@ namespace {
 			TRACE_SS(prefix << "<null>");
 		}
 		else if(node.get_type() == node_type::inode){
-			TRACE_SS(prefix << "<inode> RC: " << node._inode->_rc);
+			TRACE_SS(prefix << "<inode> RC: " << node.get_inode()->_rc);
 			QUARK_SCOPED_INDENT();
 
 			int index = 0;
-			for(auto i: node._inode->get_child_array()){
+			for(auto i: node.get_inode()->get_child_array()){
 				trace_node("#" + std::to_string(index) + "\t", i);
 				index++;
 			}
 		}
 		else if(node.get_type() == node_type::leaf_node){
-			TRACE_SS(prefix << "<leaf> RC: " << node._leaf->_rc);
+			TRACE_SS(prefix << "<leaf> RC: " << node.get_leaf_node()->_rc);
 			QUARK_SCOPED_INDENT();
 
 			int index = 0;
-			for(auto i: node._leaf->_values){
+			for(auto i: node.get_leaf_node()->_values){
 				TRACE_SS("#" << std::to_string(index) << "\t" << i);
 				(void)i;
 				index++;
@@ -1001,6 +1001,7 @@ steady_vector<T> operator+(const steady_vector<T>& a, const steady_vector<T>& b)
 ////////////////////////////////////////////			Unit tests
 
 
+namespace {
 
 
 
@@ -1062,26 +1063,36 @@ struct test_fixture {
 	int _leaf_expected_count = 0;
 };
 
-QUARK_UNIT_TEST("", "test_fixture()", "", "no assert"){
+QUARK_UNIT_TEST("", "test_fixture()", "no nodes", "no assert"){
 	test_fixture<int> test;
+	VERIFY(test._inode_count == 0);
+	VERIFY(test._leaf_count == 0);
+	VERIFY(test._inode_expected_count == 0);
+	VERIFY(test._leaf_expected_count == 0);
+}
+
+QUARK_UNIT_TEST("", "test_fixture()", "1 inode, 2 leaf nodes", "correct state (and no assert!)"){
+	test_fixture<int> test;
+
+	std::unique_ptr<inode<int>> a;
+	std::unique_ptr<leaf_node<int>> b;
+	std::unique_ptr<leaf_node<int>> c;
+	{
+		test_fixture<int> test(1, 2);
+
+		a.reset(new inode<int>({}));
+		b.reset(new leaf_node<int>({}));
+		c.reset(new leaf_node<int>({}));
+
+		VERIFY(test._inode_count == 0);
+		VERIFY(test._leaf_count == 0);
+		VERIFY(test._inode_expected_count == 1);
+		VERIFY(test._leaf_expected_count == 2);
+	}
 }
 
 
 
-
-QUARK_UNIT_TEST("", "count_to_depth()", "0", "-1"){
-	VERIFY(count_to_depth(0) == 0);
-
-	VERIFY(count_to_depth(1) == 1);
-	VERIFY(count_to_depth(2) == 1);
-	VERIFY(count_to_depth(3) == 1);
-
-	VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
-	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
-
-	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
-	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
-}
 
 
 
@@ -1124,7 +1135,6 @@ std::array<int, BRANCHING_FACTOR> generate_leaves(int start, int count){
 }
 
 
-
 /*
 	Construct a vector that uses 1 leaf node.
 
@@ -1144,10 +1154,10 @@ QUARK_UNIT_TEST("", "make_manual_vector1()", "", "correct nodes"){
 	const auto a = make_manual_vector1();
 	VERIFY(a.size() == 1);
 	VERIFY(a.get_root().get_type() == node_type::leaf_node);
-	VERIFY(a.get_root()._leaf->_rc == 1);
-	VERIFY(a.get_root()._leaf->_values[0] == 7);
+	VERIFY(a.get_root().get_leaf_node()->_rc == 1);
+	VERIFY(a.get_root().get_leaf_node()->_values[0] == 7);
 	for(int i = 1 ; i < BRANCHING_FACTOR ; i++){
-		VERIFY(a.get_root()._leaf->_values[i] == 0);
+		VERIFY(a.get_root().get_leaf_node()->_values[i] == 0);
 	}
 }
 
@@ -1171,13 +1181,12 @@ QUARK_UNIT_TEST("", "make_manual_vector2()", "", "correct nodes"){
 	const auto a = make_manual_vector2();
 	VERIFY(a.size() == 2);
 	VERIFY(a.get_root().get_type() == node_type::leaf_node);
-	VERIFY(a.get_root()._leaf->_rc == 1);
-	VERIFY(a.get_root()._leaf->_values[0] == 7);
-	VERIFY(a.get_root()._leaf->_values[1] == 8);
-	VERIFY(a.get_root()._leaf->_values[2] == 0);
-	VERIFY(a.get_root()._leaf->_values[3] == 0);
+	VERIFY(a.get_root().get_leaf_node()->_rc == 1);
+	VERIFY(a.get_root().get_leaf_node()->_values[0] == 7);
+	VERIFY(a.get_root().get_leaf_node()->_values[1] == 8);
+	VERIFY(a.get_root().get_leaf_node()->_values[2] == 0);
+	VERIFY(a.get_root().get_leaf_node()->_values[3] == 0);
 }
-
 
 
 /*
@@ -1207,16 +1216,16 @@ QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nod
 	VERIFY(a.size() == BRANCHING_FACTOR + 1);
 
 	VERIFY(a.get_root().get_type() == node_type::inode);
-	VERIFY(a.get_root()._inode->_rc == 1);
-	VERIFY(a.get_root()._inode->count_children() == 2);
-	VERIFY(a.get_root()._inode->get_child(0).get_type() == node_type::leaf_node);
-	VERIFY(a.get_root()._inode->get_child(1).get_type() == node_type::leaf_node);
+	VERIFY(a.get_root().get_inode()->_rc == 1);
+	VERIFY(a.get_root().get_inode()->count_children() == 2);
+	VERIFY(a.get_root().get_inode()->get_child(0).get_type() == node_type::leaf_node);
+	VERIFY(a.get_root().get_inode()->get_child(1).get_type() == node_type::leaf_node);
 
-	const auto leaf0 = a.get_root()._inode->get_child_as_leaf_node(0);
+	const auto leaf0 = a.get_root().get_inode()->get_child_as_leaf_node(0);
 	VERIFY(leaf0->_rc == 1);
 	VERIFY(leaf0->_values == generate_leaves(7 + BRANCHING_FACTOR * 0, BRANCHING_FACTOR));
 
-	const auto leaf1 = a.get_root()._inode->get_child_as_leaf_node(1);
+	const auto leaf1 = a.get_root().get_inode()->get_child_as_leaf_node(1);
 	VERIFY(leaf1->_rc == 1);
 	VERIFY(leaf1->_values == generate_leaves(7 + BRANCHING_FACTOR * 1, 1));
 }
@@ -1242,6 +1251,7 @@ QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nod
 		inode
 			leaf_node
 */
+
 steady_vector<int> make_manual_vector_branchfactor_square_plus_1(){
 	test_fixture<int> f(3, BRANCHING_FACTOR + 1);
 
@@ -1267,37 +1277,34 @@ QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_square_plus_1()", "", "corr
 
 	node_ref<int> rootINode = a.get_root();
 	VERIFY(rootINode.get_type() == node_type::inode);
-	VERIFY(rootINode._inode->_rc == 2);
-	VERIFY(rootINode._inode->count_children() == 2);
-	VERIFY(rootINode._inode->get_child(0).get_type() == node_type::inode);
-	VERIFY(rootINode._inode->get_child(1).get_type() == node_type::inode);
+	VERIFY(rootINode.get_inode()->_rc == 2);
+	VERIFY(rootINode.get_inode()->count_children() == 2);
+	VERIFY(rootINode.get_inode()->get_child(0).get_type() == node_type::inode);
+	VERIFY(rootINode.get_inode()->get_child(1).get_type() == node_type::inode);
 
-	node_ref<int> inodeA = rootINode._inode->get_child(0);
+	node_ref<int> inodeA = rootINode.get_inode()->get_child(0);
 		VERIFY(inodeA.get_type() == node_type::inode);
-		VERIFY(inodeA._inode->_rc == 2);
-		VERIFY(inodeA._inode->count_children() == BRANCHING_FACTOR);
+		VERIFY(inodeA.get_inode()->_rc == 2);
+		VERIFY(inodeA.get_inode()->count_children() == BRANCHING_FACTOR);
 		for(int i = 0 ; i < BRANCHING_FACTOR ; i++){
-			const auto leafNode = inodeA._inode->get_child_as_leaf_node(i);
+			const auto leafNode = inodeA.get_inode()->get_child_as_leaf_node(i);
 			VERIFY(leafNode->_rc == 1);
 			VERIFY(leafNode->_values == generate_leaves(1000 + BRANCHING_FACTOR * i, BRANCHING_FACTOR));
 		}
 
-	node_ref<int> inodeB = rootINode._inode->get_child(1);
+	node_ref<int> inodeB = rootINode.get_inode()->get_child(1);
 		VERIFY(inodeB.get_type() == node_type::inode);
-		VERIFY(inodeB._inode->_rc == 2);
-		VERIFY(inodeB._inode->count_children() == 1);
-		VERIFY(inodeB._inode->get_child(0).get_type() == node_type::leaf_node);
+		VERIFY(inodeB.get_inode()->_rc == 2);
+		VERIFY(inodeB.get_inode()->count_children() == 1);
+		VERIFY(inodeB.get_inode()->get_child(0).get_type() == node_type::leaf_node);
 
-		const auto leaf4 = inodeB._inode->get_child_as_leaf_node(0);
+		const auto leaf4 = inodeB.get_inode()->get_child_as_leaf_node(0);
 		VERIFY(leaf4->_rc == 1);
 		VERIFY(leaf4->_values == generate_leaves(1000 + BRANCHING_FACTOR * BRANCHING_FACTOR + 0, 1));
 }
 
 
-
-
 ////////////////////////////////////////////		steady_vector::steady_vector()
-
 
 
 QUARK_UNIT_TEST("steady_vector", "steady_vector()", "", "no_assert"){
@@ -1357,7 +1364,6 @@ QUARK_UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 values", "rea
 ////////////////////////////////////////////		steady_vector::assoc()
 
 
-
 QUARK_UNIT_TEST("steady_vector", "assoc()", "1 value", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector1();
@@ -1366,7 +1372,6 @@ QUARK_UNIT_TEST("steady_vector", "assoc()", "1 value", "read back"){
 	VERIFY(b[0] == 1000);
 	a.trace_internals();
 }
-
 
 QUARK_UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #0", "read back"){
 	test_fixture<int> f;
@@ -1415,31 +1420,25 @@ QUARK_UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace value 10000
 }
 
 
-
-
 ////////////////////////////////////////////		steady_vector::push_back()
 
 
-
-
-namespace {
-	steady_vector<int> push_back_n(int count, int value0){
-	//	test_fixture<int> f;
-		steady_vector<int> a;
-		for(int i = 0 ; i < count ; i++){
-			a = a.push_back(value0 + i);
-		}
-		return a;
+steady_vector<int> push_back_n(int count, int value0){
+//	test_fixture<int> f;
+	steady_vector<int> a;
+	for(int i = 0 ; i < count ; i++){
+		a = a.push_back(value0 + i);
 	}
+	return a;
+}
 
-	void test_values(const steady_vector<int>& vec, int value0){
-		test_fixture<int> f;
+void test_values(const steady_vector<int>& vec, int value0){
+	test_fixture<int> f;
 
-		for(int i = 0 ; i < vec.size() ; i++){
-			const auto value = vec[i];
-			const auto expected = value0 + i;
-			VERIFY(value == expected);
-		}
+	for(int i = 0 ; i < vec.size() ; i++){
+		const auto value = vec[i];
+		const auto expected = value0 + i;
+		VERIFY(value == expected);
 	}
 }
 
@@ -1527,7 +1526,6 @@ QUARK_UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector")
 }
 
 
-
 ////////////////////////////////////////////		steady_vector::operator==()
 
 
@@ -1567,9 +1565,7 @@ QUARK_UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
 }
 
 
-
 ////////////////////////////////////////////		steady_vector::size()
-
 
 
 QUARK_UNIT_TEST("steady_vector", "size()", "empty vector", "0"){
@@ -1585,9 +1581,7 @@ QUARK_UNIT_TEST("steady_vector", "size()", "BranchFactorSquarePlus1", "BranchFac
 }
 
 
-
 ////////////////////////////////////////////		steady_vector::steady_vector(const std::vector<T>& vec)
-
 
 
 QUARK_UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "0 values", "empty"){
@@ -1622,7 +1616,6 @@ QUARK_UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)"
 	VERIFY(v.size() == 0);
 }
 
-
 QUARK_UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "7 values", "read back all"){
 	test_fixture<int> f;
 	const int a[] = {	3, 4, 5, 6, 7, 8, 9	};
@@ -1646,7 +1639,6 @@ QUARK_UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)",
 	steady_vector<int> v = {};
 	VERIFY(v.size() == 0);
 }
-
 
 QUARK_UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 values", "read back all"){
 	test_fixture<int> f;
@@ -1690,6 +1682,16 @@ QUARK_UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "emp
 	VERIFY(b.empty());
 }
 
+template <class T>
+bool same_root(const steady_vector<T>& a, const steady_vector<T>& b){
+	if(a.get_root().get_type() == node_type::inode){
+		return a.get_root().get_inode() == b.get_root().get_inode();
+	}
+	else{
+		return a.get_root().get_leaf_node() == b.get_root().get_leaf_node();
+	}
+}
+
 QUARK_UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 values", "identical, sharing root"){
 	test_fixture<int> f;
 	const auto data = std::vector<int>{	3, 4, 5, 6, 7, 8, 9	};
@@ -1698,13 +1700,12 @@ QUARK_UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 v
 
 	VERIFY(a.to_vec() == data);
 	VERIFY(b.to_vec() == data);
-	VERIFY(a.get_root()._leaf == b.get_root()._leaf);
+	VERIFY(same_root(a, b));
 }
 
 
 
 ////////////////////////////////////////////		steady_vector::operator=()
-
 
 
 QUARK_UNIT_TEST("steady_vector", "operator=()", "empty", "empty"){
@@ -1728,10 +1729,11 @@ QUARK_UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing 
 
 	VERIFY(a.to_vec() == data);
 	VERIFY(b.to_vec() == data);
-	VERIFY(a.get_root()._leaf == b.get_root()._leaf);
+	VERIFY(same_root(a, b));
 }
 
 
+////////////////////////////////////////////		operator+()
 
 
 QUARK_UNIT_TEST("steady_vector", "operator+()", "3 + 4 values", "7 values"){
@@ -1744,7 +1746,6 @@ QUARK_UNIT_TEST("steady_vector", "operator+()", "3 + 4 values", "7 values"){
 	VERIFY(c.to_vec() == (std::vector<int>{ 2, 3, 4, 5, 6, 7, 8 }));
 }
 
-
-
+}
 
 }	//	steady

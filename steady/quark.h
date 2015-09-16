@@ -1,9 +1,3 @@
-//
-//  quark.h
-//
-//  Created by Marcus Zetterquist on 2013-11-16.
-//  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
-//
 
 #ifndef quark_h
 #define quark_h

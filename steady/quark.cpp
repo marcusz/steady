@@ -1,9 +1,3 @@
-//
-//  quark.cpp
-//
-//  Created by Marcus Zetterquist on 2013-11-22.
-//  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
-//
 
 #include "quark.h"
 
