@@ -13,10 +13,11 @@
 #include <cassert>
 #include <sstream>
 
-//#include "Paths.h"
 
 
-#if CPP_EXTENSION__UNIT_TESTS_ON
+namespace quark {
+
+#if QUARK__UNIT_TESTS_ON
 TUniTestRegistry* TUnitTestReg::gRegistry = nullptr;
 #endif
 
@@ -46,7 +47,7 @@ void SetRuntime(icppextension_runtime* iRuntime){
 
 
 
-#if CPP_EXTENSION__ASSERT_ON
+#if QUARK__ASSERT_ON
 
 void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
 	assert(iRuntime != nullptr);
@@ -66,7 +67,7 @@ void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocat
 
 
 
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 
 void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]){
 	assert(iRuntime != nullptr);
@@ -99,7 +100,7 @@ void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS){
 
 
 
-#if CPP_EXTENSION__UNIT_TESTS_ON
+#if QUARK__UNIT_TESTS_ON
 
 void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
 	assert(iRuntime != nullptr);
@@ -211,4 +212,6 @@ void TDefaultRuntime::icppextension_runtime__on_unit_test_failed(const TSourceLo
 	throw std::logic_error("Unit test failed");
 }
 
+
+}
 

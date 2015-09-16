@@ -15,12 +15,12 @@
 #include <sstream>
 
 
-#define CPP_EXTENSION__ASSERT_ON true
-#define CPP_EXTENSION__TRACE_ON true
-#define CPP_EXTENSION__UNIT_TESTS_ON true
+#define QUARK__ASSERT_ON true
+#define QUARK__TRACE_ON true
+#define QUARK__UNIT_TESTS_ON true
 
 
-
+namespace quark {
 
 
 //	PRIMITIVES
@@ -143,11 +143,11 @@ void SetRuntime(icppextension_runtime* iRuntime);
 //	ASSERT SUPPORT
 //	====================================================================================================================
 
-#if CPP_EXTENSION__ASSERT_ON
+#if QUARK__ASSERT_ON
 
 void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]) __dead2;
 
-#define ASSERT(x) if(x){}else {OnAssertHook(::GetRuntime(), TSourceLocation(__FILE__, __LINE__), PP_STRING(x)); }
+#define ASSERT(x) if(x){}else {::quark::OnAssertHook(::quark::GetRuntime(), quark::TSourceLocation(__FILE__, __LINE__), PP_STRING(x)); }
 
 #define ASSERT_UNREACHABLE ASSERT(false)
 #else
@@ -175,7 +175,7 @@ void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocat
 
 struct CScopedTrace {
 	CScopedTrace(const char s[]){
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s);
 		r->icppextension_runtime__trace("{");
@@ -183,7 +183,7 @@ struct CScopedTrace {
 #endif
 	}
 	CScopedTrace(const std::string& s){
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s.c_str());
 		r->icppextension_runtime__trace("{");
@@ -191,7 +191,7 @@ struct CScopedTrace {
 #endif
 	}
 	CScopedTrace(const std::stringstream& s){
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__trace(s.str().c_str());
 		r->icppextension_runtime__trace("{");
@@ -199,7 +199,7 @@ struct CScopedTrace {
 #endif
 	}
 	~CScopedTrace(){
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__add_log_indent(-1);
 		r->icppextension_runtime__trace("}");
@@ -216,7 +216,7 @@ struct CScopedTrace {
 */
 
 struct CScopedIndent {
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 	CScopedIndent(){
 		icppextension_runtime* r = GetRuntime();
 		r->icppextension_runtime__add_log_indent(1);
@@ -228,7 +228,7 @@ struct CScopedIndent {
 #endif
 };
 
-#if CPP_EXTENSION__TRACE_ON
+#if QUARK__TRACE_ON
 
 
 ////////////////////////////		Hook functions.
@@ -244,18 +244,18 @@ void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS);
 
 
 //	### Use runtime as explicit argument instead?
-#define TRACE(s) ::OnTraceHook(::GetRuntime(), s)
-#define TRACE_SS(x) {std::stringstream ss; ss << x; ::OnTraceHook(::GetRuntime(), ss);}
+#define TRACE(s) ::quark::OnTraceHook(::quark::GetRuntime(), s)
+#define TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::OnTraceHook(::quark::GetRuntime(), ss);}
 
 /**
 	Works with:
 		char[]
 		std::string
 */
-#define SCOPED_TRACE(s) CScopedTrace PP_UNIQUE_LABEL(scoped_trace) (s)
-#define SCOPED_INDENT() CScopedIndent PP_UNIQUE_LABEL(scoped_indent)
+#define SCOPED_TRACE(s) ::quark::CScopedTrace PP_UNIQUE_LABEL(scoped_trace) (s)
+#define SCOPED_INDENT() ::quark::CScopedIndent PP_UNIQUE_LABEL(scoped_indent)
 
-#define TRACE_FUNCTION() CScopedTrace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
+#define TRACE_FUNCTION() ::quark::CScopedTrace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
 
 
 #else
@@ -277,7 +277,7 @@ void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS);
 //	====================================================================================================================
 
 
-#if CPP_EXTENSION__UNIT_TESTS_ON
+#if QUARK__UNIT_TESTS_ON
 
 
 typedef void (*unit_test_function)();
@@ -374,11 +374,11 @@ void run_tests();
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
 #define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)(); \
-	static TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
+	static ::quark::TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
 //### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
-#define UT_VERIFY(exp) if(exp){}else{ OnUnitTestFailedHook(::GetRuntime(), TSourceLocation(__FILE__, __LINE__), PP_STRING(exp)); }
+#define UT_VERIFY(exp) if(exp){}else{ ::quark::OnUnitTestFailedHook(::quark::GetRuntime(), ::quark::TSourceLocation(__FILE__, __LINE__), PP_STRING(exp)); }
 
 #define TEST_VERIFY UT_VERIFY
 
@@ -439,5 +439,7 @@ struct TDefaultRuntime : public icppextension_runtime {
 		long fIndent;
 };
 
+
+}	//	quark
 
 #endif

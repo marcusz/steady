@@ -1039,7 +1039,7 @@ struct test_fixture {
 		TEST_VERIFY(leaf_expected_diff == _leaf_expected_count);
 	}
 
-	CScopedTrace _scoped_tracer;
+	quark::CScopedTrace _scoped_tracer;
 	int _inode_count = 0;
 	int _leaf_count = 0;
 

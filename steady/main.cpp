@@ -23,11 +23,11 @@ void Example(){
 }
 
 int main(int argc, const char * argv[]){
-	TDefaultRuntime runtime("");
+	quark::TDefaultRuntime runtime("");
 	SetRuntime(&runtime);
 
-#if CPP_EXTENSION__UNIT_TESTS_ON
-	run_tests();
+#if QUARK__UNIT_TESTS_ON
+	quark::run_tests();
 #endif
 
 	try {
