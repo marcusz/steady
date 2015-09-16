@@ -23,15 +23,15 @@ TUniTestRegistry* TUnitTestReg::gRegistry = nullptr;
 
 
 namespace {
-	icppextension_runtime* gRuntimePtr = nullptr;
+	runtime_i* gRuntimePtr = nullptr;
 }
 
 
-icppextension_runtime* GetRuntime(){
+runtime_i* get_runtime(){
 	return gRuntimePtr;
 }
 
-void SetRuntime(icppextension_runtime* iRuntime){
+void set_runtime(runtime_i* iRuntime){
 	gRuntimePtr = iRuntime;
 }
 
@@ -49,11 +49,11 @@ void SetRuntime(icppextension_runtime* iRuntime){
 
 #if QUARK__ASSERT_ON
 
-void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
-	assert(iRuntime != nullptr);
-	assert(iExpression != nullptr);
+void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]){
+	assert(runtime != nullptr);
+	assert(expression != nullptr);
 
-	iRuntime->icppextension_runtime__on_assert(iLocation, iExpression);
+	runtime->runtime_i__on_assert(location, expression);
 	exit(-1);
 }
 
@@ -69,23 +69,23 @@ void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocat
 
 #if QUARK__TRACE_ON
 
-void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]){
-	assert(iRuntime != nullptr);
-	assert(iS != nullptr);
+void on_trace_hook(runtime_i* runtime, const char s[]){
+	assert(runtime != nullptr);
+	assert(s != nullptr);
 
-	iRuntime->icppextension_runtime__trace(iS);
+	runtime->runtime_i__trace(s);
 }
 
-void OnTraceHook(icppextension_runtime* iRuntime, const std::string& iS){
-	assert(iRuntime != nullptr);
+void on_trace_hook(runtime_i* runtime, const std::string& s){
+	assert(runtime != nullptr);
 
-	iRuntime->icppextension_runtime__trace(iS.c_str());
+	runtime->runtime_i__trace(s.c_str());
 }
 
-void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS){
-	assert(iRuntime != nullptr);
+void on_trace_hook(runtime_i* runtime, const std::stringstream& s){
+	assert(runtime != nullptr);
 
-	iRuntime->icppextension_runtime__trace(iS.str().c_str());
+	runtime->runtime_i__trace(s.str().c_str());
 }
 
 #endif
@@ -102,15 +102,15 @@ void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS){
 
 #if QUARK__UNIT_TESTS_ON
 
-void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]){
+void OnUnitTestFailedHook(runtime_i* iRuntime, const source_code_location& location, const char expression[]){
 	assert(iRuntime != nullptr);
-	assert(iExpression != nullptr);
+	assert(expression != nullptr);
 
-	iRuntime->icppextension_runtime__on_unit_test_failed(iLocation, iExpression);
+	iRuntime->runtime_i__on_unit_test_failed(location, expression);
 }
 
 /*
-std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]){
+std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]){
 	ASSERT(iRuntime != nullptr);
 	ASSERT(iModuleUnderTest != nullptr);
 	ASSERT(iSourceFilePath != nullptr);
@@ -122,13 +122,13 @@ std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char
 */
 
 void run_tests(){
-	TRACE_FUNCTION();
-	ASSERT(TUnitTestReg::gRegistry != nullptr);
+	QUARK_TRACE_FUNCTION();
+	QUARK_ASSERT(TUnitTestReg::gRegistry != nullptr);
 
 	std::size_t test_count = TUnitTestReg::gRegistry->fTests.size();
 //	std::size_t fail_count = 0;
 
-	TRACE_SS("Running " << test_count << " tests...");
+	QUARK_TRACE_SS("Running " << test_count << " tests...");
 
 	for(std::size_t i = 0 ; i < test_count ; i++){
 		const TUnitTestDefinition& test = TUnitTestReg::gRegistry->fTests[i];
@@ -141,18 +141,18 @@ void run_tests(){
 			<< " | " << test._expected_result;
 
 		try{
-			SCOPED_TRACE(testInfo.str());
+			QUARK_SCOPED_TRACE(testInfo.str());
 			test._test_f();
 		}
 		catch(...){
-			TRACE("FAILURE: " + testInfo.str());
+			QUARK_TRACE("FAILURE: " + testInfo.str());
 //			fail_count++;
 			exit(-1);
 		}
 	}
 
 //	if(fail_count == 0){
-		TRACE_SS("Success - " << test_count << " tests!");
+		QUARK_TRACE_SS("Success - " << test_count << " tests!");
 //	}
 //	else{
 //		TRACE_SS("FAILED " << fail_count << " out of " << test_count << " tests!");
@@ -184,7 +184,7 @@ TDefaultRuntime::TDefaultRuntime(const std::string& iTestDataRoot) :
 {
 }
 
-void TDefaultRuntime::icppextension_runtime__trace(const char s[]){
+void TDefaultRuntime::runtime_i__trace(const char s[]){
 //		for (auto &i: items){
 //		}
 	for(long i = 0 ; i < fIndent ; i++){
@@ -195,22 +195,43 @@ void TDefaultRuntime::icppextension_runtime__trace(const char s[]){
 	std::cout << std::endl;
 }
 
-void TDefaultRuntime::icppextension_runtime__add_log_indent(long iAdd){
+void TDefaultRuntime::runtime_i__add_log_indent(long iAdd){
 	fIndent += iAdd;
 }
 
-void TDefaultRuntime::icppextension_runtime__on_assert(const TSourceLocation& iLocation, const char iExpression[]){
-	TRACE_SS(std::string("Assertion failed ") << iLocation.fSourceFile << ", " << iLocation.fLineNumber << " \"" << iExpression << "\"");
+void TDefaultRuntime::runtime_i__on_assert(const source_code_location& location, const char expression[]){
+	QUARK_TRACE_SS(std::string("Assertion failed ") << location._source_file << ", " << location._line_number << " \"" << expression << "\"");
 	perror("perror() says");
 	throw std::logic_error("assert");
 }
 
-void TDefaultRuntime::icppextension_runtime__on_unit_test_failed(const TSourceLocation& iLocation, const char iExpression[]){
-	TRACE_SS("Unit test failed " << iLocation.fSourceFile << ", " << iLocation.fLineNumber << " \"" << iExpression << "\"");
+void TDefaultRuntime::runtime_i__on_unit_test_failed(const source_code_location& location, const char expression[]){
+	QUARK_TRACE_SS("Unit test failed " << location._source_file << ", " << location._line_number << " \"" << expression << "\"");
 	perror("perror() says");
 
 	throw std::logic_error("Unit test failed");
 }
+
+
+/*
+	This function uses all macros so we know they compile.
+*/
+void TestMacros(){
+	QUARK_ASSERT(true);
+	QUARK_ASSERT_UNREACHABLE;
+
+	QUARK_TRACE("hello");
+	QUARK_TRACE_SS("hello" << 1234);
+	QUARK_SCOPED_TRACE("scoped trace");
+	QUARK_SCOPED_INDENT();
+	QUARK_TRACE_FUNCTION();
+}
+
+QUARK_UNIT_TEST("", "", "", ""){
+	QUARK_UT_VERIFY(true);
+	QUARK_TEST_VERIFY(true);
+}
+
 
 
 }

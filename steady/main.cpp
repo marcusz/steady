@@ -19,23 +19,23 @@ void Example(){
 	a = a.push_back(8);
 	a = a.push_back(11);
 
-	ASSERT(a.size() == 3);
+	QUARK_ASSERT(a.size() == 3);
 }
 
 int main(int argc, const char * argv[]){
 	quark::TDefaultRuntime runtime("");
-	SetRuntime(&runtime);
+	quark::set_runtime(&runtime);
 
 #if QUARK__UNIT_TESTS_ON
 	quark::run_tests();
 #endif
 
 	try {
-		TRACE("Hello, World 3!");
+		QUARK_TRACE("Hello, World 3!");
 		Example();
 	}
 	catch(...){
-		TRACE("Error");
+		QUARK_TRACE("Error");
 		return -1;
 	}
 

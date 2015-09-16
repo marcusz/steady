@@ -71,7 +71,11 @@ Over-alloc / reserve nodes?
 
 */
 
+#define ASSERT(x) QUARK_ASSERT(x)
+#define TRACE(x) QUARK_TRACE(x)
+#define TRACE_SS(x) QUARK_TRACE_SS(x)
 
+#define VERIFY(x) QUARK_TEST_VERIFY(x)
 
 
 namespace steady {
@@ -449,7 +453,7 @@ node_type node_ref<T>::get_type() const {
 		return node_type::leaf_node;
 	}
 	else{
-		ASSERT_UNREACHABLE;
+		QUARK_ASSERT_UNREACHABLE;
 	}
 }
 
@@ -941,7 +945,7 @@ namespace {
 		}
 		else if(node.get_type() == node_type::inode){
 			TRACE_SS(prefix << "<inode> RC: " << node._inode->_rc);
-			SCOPED_INDENT();
+			QUARK_SCOPED_INDENT();
 
 			int index = 0;
 			for(auto i: node._inode->get_child_array()){
@@ -951,7 +955,7 @@ namespace {
 		}
 		else if(node.get_type() == node_type::leaf_node){
 			TRACE_SS(prefix << "<leaf> RC: " << node._leaf->_rc);
-			SCOPED_INDENT();
+			QUARK_SCOPED_INDENT();
 
 			int index = 0;
 			for(auto i: node._leaf->_values){
@@ -992,7 +996,7 @@ void steady_vector<T>::trace_internals() const{
 void vector_test(const std::vector<int>& v){
 }
 
-UNIT_TEST("std::vector<>", "auto convertion from initializer list", "", ""){
+QUARK_UNIT_TEST("std::vector<>", "auto convertion from initializer list", "", ""){
 	std::vector<int> vi {1,2,3,4,5,6};
 
 	vector_test(vi);
@@ -1035,11 +1039,11 @@ struct test_fixture {
 		int leaf_expected_diff = leaf_count - _leaf_count;
 
 
-		TEST_VERIFY(inode_diff_count == _inode_expected_count);
-		TEST_VERIFY(leaf_expected_diff == _leaf_expected_count);
+		VERIFY(inode_diff_count == _inode_expected_count);
+		VERIFY(leaf_expected_diff == _leaf_expected_count);
 	}
 
-	quark::CScopedTrace _scoped_tracer;
+	quark::scoped_trace _scoped_tracer;
 	int _inode_count = 0;
 	int _leaf_count = 0;
 
@@ -1047,25 +1051,25 @@ struct test_fixture {
 	int _leaf_expected_count = 0;
 };
 
-UNIT_TEST("", "test_fixture()", "", "no assert"){
+QUARK_UNIT_TEST("", "test_fixture()", "", "no assert"){
 	test_fixture<int> test;
 }
 
 
 
 
-UNIT_TEST("", "count_to_depth()", "0", "-1"){
-	TEST_VERIFY(count_to_depth(0) == 0);
+QUARK_UNIT_TEST("", "count_to_depth()", "0", "-1"){
+	VERIFY(count_to_depth(0) == 0);
 
-	TEST_VERIFY(count_to_depth(1) == 1);
-	TEST_VERIFY(count_to_depth(2) == 1);
-	TEST_VERIFY(count_to_depth(3) == 1);
+	VERIFY(count_to_depth(1) == 1);
+	VERIFY(count_to_depth(2) == 1);
+	VERIFY(count_to_depth(3) == 1);
 
-	TEST_VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
-	TEST_VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
+	VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
 
-	TEST_VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
-	TEST_VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
 }
 
 
@@ -1093,9 +1097,9 @@ std::vector<int> generate_numbers(int start, int count, int total_count){
 	return a;
 }
 
-UNIT_TEST("", "generate_numbers()", "5 numbers", "correct vector"){
+QUARK_UNIT_TEST("", "generate_numbers()", "5 numbers", "correct vector"){
 	const auto a = generate_numbers(8, 4, 7);
-	TEST_VERIFY(a == (std::vector<int>{ 8, 9, 10, 11, 0, 0, 0 }));
+	VERIFY(a == (std::vector<int>{ 8, 9, 10, 11, 0, 0, 0 }));
 }
 
 std::array<int, BRANCHING_FACTOR> generate_leaves(int start, int count){
@@ -1123,16 +1127,16 @@ steady_vector<int> make_manual_vector1(){
 	return steady_vector<int>(leaf, 1);
 }
 
-UNIT_TEST("", "make_manual_vector1()", "", "correct nodes"){
+QUARK_UNIT_TEST("", "make_manual_vector1()", "", "correct nodes"){
 	test_fixture<int> f;
 
 	const auto a = make_manual_vector1();
-	TEST_VERIFY(a.size() == 1);
-	TEST_VERIFY(a.get_root().get_type() == node_type::leaf_node);
-	TEST_VERIFY(a.get_root()._leaf->_rc == 1);
-	TEST_VERIFY(a.get_root()._leaf->_values[0] == 7);
+	VERIFY(a.size() == 1);
+	VERIFY(a.get_root().get_type() == node_type::leaf_node);
+	VERIFY(a.get_root()._leaf->_rc == 1);
+	VERIFY(a.get_root()._leaf->_values[0] == 7);
 	for(int i = 1 ; i < BRANCHING_FACTOR ; i++){
-		TEST_VERIFY(a.get_root()._leaf->_values[i] == 0);
+		VERIFY(a.get_root()._leaf->_values[i] == 0);
 	}
 }
 
@@ -1151,16 +1155,16 @@ steady_vector<int> make_manual_vector2(){
 	return steady_vector<int>(leaf, 2);
 }
 
-UNIT_TEST("", "make_manual_vector2()", "", "correct nodes"){
+QUARK_UNIT_TEST("", "make_manual_vector2()", "", "correct nodes"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector2();
-	TEST_VERIFY(a.size() == 2);
-	TEST_VERIFY(a.get_root().get_type() == node_type::leaf_node);
-	TEST_VERIFY(a.get_root()._leaf->_rc == 1);
-	TEST_VERIFY(a.get_root()._leaf->_values[0] == 7);
-	TEST_VERIFY(a.get_root()._leaf->_values[1] == 8);
-	TEST_VERIFY(a.get_root()._leaf->_values[2] == 0);
-	TEST_VERIFY(a.get_root()._leaf->_values[3] == 0);
+	VERIFY(a.size() == 2);
+	VERIFY(a.get_root().get_type() == node_type::leaf_node);
+	VERIFY(a.get_root()._leaf->_rc == 1);
+	VERIFY(a.get_root()._leaf->_values[0] == 7);
+	VERIFY(a.get_root()._leaf->_values[1] == 8);
+	VERIFY(a.get_root()._leaf->_values[2] == 0);
+	VERIFY(a.get_root()._leaf->_values[3] == 0);
 }
 
 
@@ -1185,25 +1189,25 @@ steady_vector<int> make_manual_vector_branchfactor_plus_1(){
 	return steady_vector<int>(inode, BRANCHING_FACTOR + 1);
 }
 
-UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nodes"){
+QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nodes"){
 	test_fixture<int> f;
 
 	const auto a = make_manual_vector_branchfactor_plus_1();
-	TEST_VERIFY(a.size() == BRANCHING_FACTOR + 1);
+	VERIFY(a.size() == BRANCHING_FACTOR + 1);
 
-	TEST_VERIFY(a.get_root().get_type() == node_type::inode);
-	TEST_VERIFY(a.get_root()._inode->_rc == 1);
-	TEST_VERIFY(a.get_root()._inode->count_children() == 2);
-	TEST_VERIFY(a.get_root()._inode->get_child(0).get_type() == node_type::leaf_node);
-	TEST_VERIFY(a.get_root()._inode->get_child(1).get_type() == node_type::leaf_node);
+	VERIFY(a.get_root().get_type() == node_type::inode);
+	VERIFY(a.get_root()._inode->_rc == 1);
+	VERIFY(a.get_root()._inode->count_children() == 2);
+	VERIFY(a.get_root()._inode->get_child(0).get_type() == node_type::leaf_node);
+	VERIFY(a.get_root()._inode->get_child(1).get_type() == node_type::leaf_node);
 
 	const auto leaf0 = a.get_root()._inode->get_child_as_leaf_node(0);
-	TEST_VERIFY(leaf0->_rc == 1);
-	TEST_VERIFY(leaf0->_values == generate_leaves(7 + BRANCHING_FACTOR * 0, BRANCHING_FACTOR));
+	VERIFY(leaf0->_rc == 1);
+	VERIFY(leaf0->_values == generate_leaves(7 + BRANCHING_FACTOR * 0, BRANCHING_FACTOR));
 
 	const auto leaf1 = a.get_root()._inode->get_child_as_leaf_node(1);
-	TEST_VERIFY(leaf1->_rc == 1);
-	TEST_VERIFY(leaf1->_values == generate_leaves(7 + BRANCHING_FACTOR * 1, 1));
+	VERIFY(leaf1->_rc == 1);
+	VERIFY(leaf1->_values == generate_leaves(7 + BRANCHING_FACTOR * 1, 1));
 }
 
 /*
@@ -1244,38 +1248,38 @@ steady_vector<int> make_manual_vector_branchfactor_square_plus_1(){
 	return steady_vector<int>(rootInode, BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
 }
 
-UNIT_TEST("", "make_manual_vector_branchfactor_square_plus_1()", "", "correct nodes"){
+QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_square_plus_1()", "", "correct nodes"){
 	test_fixture<int> f;
 
 	const auto a = make_manual_vector_branchfactor_square_plus_1();
-	TEST_VERIFY(a.size() == BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
+	VERIFY(a.size() == BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
 
 	node_ref<int> rootINode = a.get_root();
-	TEST_VERIFY(rootINode.get_type() == node_type::inode);
-	TEST_VERIFY(rootINode._inode->_rc == 2);
-	TEST_VERIFY(rootINode._inode->count_children() == 2);
-	TEST_VERIFY(rootINode._inode->get_child(0).get_type() == node_type::inode);
-	TEST_VERIFY(rootINode._inode->get_child(1).get_type() == node_type::inode);
+	VERIFY(rootINode.get_type() == node_type::inode);
+	VERIFY(rootINode._inode->_rc == 2);
+	VERIFY(rootINode._inode->count_children() == 2);
+	VERIFY(rootINode._inode->get_child(0).get_type() == node_type::inode);
+	VERIFY(rootINode._inode->get_child(1).get_type() == node_type::inode);
 
 	node_ref<int> inodeA = rootINode._inode->get_child(0);
-		TEST_VERIFY(inodeA.get_type() == node_type::inode);
-		TEST_VERIFY(inodeA._inode->_rc == 2);
-		TEST_VERIFY(inodeA._inode->count_children() == BRANCHING_FACTOR);
+		VERIFY(inodeA.get_type() == node_type::inode);
+		VERIFY(inodeA._inode->_rc == 2);
+		VERIFY(inodeA._inode->count_children() == BRANCHING_FACTOR);
 		for(int i = 0 ; i < BRANCHING_FACTOR ; i++){
 			const auto leafNode = inodeA._inode->get_child_as_leaf_node(i);
-			TEST_VERIFY(leafNode->_rc == 1);
-			TEST_VERIFY(leafNode->_values == generate_leaves(1000 + BRANCHING_FACTOR * i, BRANCHING_FACTOR));
+			VERIFY(leafNode->_rc == 1);
+			VERIFY(leafNode->_values == generate_leaves(1000 + BRANCHING_FACTOR * i, BRANCHING_FACTOR));
 		}
 
 	node_ref<int> inodeB = rootINode._inode->get_child(1);
-		TEST_VERIFY(inodeB.get_type() == node_type::inode);
-		TEST_VERIFY(inodeB._inode->_rc == 2);
-		TEST_VERIFY(inodeB._inode->count_children() == 1);
-		TEST_VERIFY(inodeB._inode->get_child(0).get_type() == node_type::leaf_node);
+		VERIFY(inodeB.get_type() == node_type::inode);
+		VERIFY(inodeB._inode->_rc == 2);
+		VERIFY(inodeB._inode->count_children() == 1);
+		VERIFY(inodeB._inode->get_child(0).get_type() == node_type::leaf_node);
 
 		const auto leaf4 = inodeB._inode->get_child_as_leaf_node(0);
-		TEST_VERIFY(leaf4->_rc == 1);
-		TEST_VERIFY(leaf4->_values == generate_leaves(1000 + BRANCHING_FACTOR * BRANCHING_FACTOR + 0, 1));
+		VERIFY(leaf4->_rc == 1);
+		VERIFY(leaf4->_values == generate_leaves(1000 + BRANCHING_FACTOR * BRANCHING_FACTOR + 0, 1));
 }
 
 
@@ -1285,7 +1289,7 @@ UNIT_TEST("", "make_manual_vector_branchfactor_square_plus_1()", "", "correct no
 
 
 
-UNIT_TEST("steady_vector", "steady_vector()", "", "no_assert"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector()", "", "no_assert"){
 	test_fixture<int> f;
 
 	steady_vector<int> v;
@@ -1296,45 +1300,45 @@ UNIT_TEST("steady_vector", "steady_vector()", "", "no_assert"){
 ////////////////////////////////////////////		steady_vector::operator[]
 
 
-UNIT_TEST("steady_vector", "operator[]", "1 value", "read back"){
+QUARK_UNIT_TEST("steady_vector", "operator[]", "1 value", "read back"){
 	test_fixture<int> f;
 
 	const auto a = make_manual_vector1();
-	TEST_VERIFY(a[0] == 7);
+	VERIFY(a[0] == 7);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 values", "read back"){
+QUARK_UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 values", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_plus_1();
-	TEST_VERIFY(a[0] == 7);
-	TEST_VERIFY(a[1] == 8);
-	TEST_VERIFY(a[2] == 9);
-	TEST_VERIFY(a[3] == 10);
-	TEST_VERIFY(a[4] == 11);
+	VERIFY(a[0] == 7);
+	VERIFY(a[1] == 8);
+	VERIFY(a[2] == 9);
+	VERIFY(a[3] == 10);
+	VERIFY(a[4] == 11);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 values", "read back"){
+QUARK_UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 values", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_square_plus_1();
-	TEST_VERIFY(a[0] == 1000);
-	TEST_VERIFY(a[1] == 1001);
-	TEST_VERIFY(a[2] == 1002);
-	TEST_VERIFY(a[3] == 1003);
-	TEST_VERIFY(a[4] == 1004);
-	TEST_VERIFY(a[5] == 1005);
-	TEST_VERIFY(a[6] == 1006);
-	TEST_VERIFY(a[7] == 1007);
-	TEST_VERIFY(a[8] == 1008);
-	TEST_VERIFY(a[9] == 1009);
-	TEST_VERIFY(a[10] == 1010);
-	TEST_VERIFY(a[11] == 1011);
-	TEST_VERIFY(a[12] == 1012);
-	TEST_VERIFY(a[13] == 1013);
-	TEST_VERIFY(a[14] == 1014);
-	TEST_VERIFY(a[15] == 1015);
-	TEST_VERIFY(a[16] == 1016);
+	VERIFY(a[0] == 1000);
+	VERIFY(a[1] == 1001);
+	VERIFY(a[2] == 1002);
+	VERIFY(a[3] == 1003);
+	VERIFY(a[4] == 1004);
+	VERIFY(a[5] == 1005);
+	VERIFY(a[6] == 1006);
+	VERIFY(a[7] == 1007);
+	VERIFY(a[8] == 1008);
+	VERIFY(a[9] == 1009);
+	VERIFY(a[10] == 1010);
+	VERIFY(a[11] == 1011);
+	VERIFY(a[12] == 1012);
+	VERIFY(a[13] == 1013);
+	VERIFY(a[14] == 1014);
+	VERIFY(a[15] == 1015);
+	VERIFY(a[16] == 1016);
 	a.trace_internals();
 }
 
@@ -1343,33 +1347,33 @@ UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 values", "read back
 
 
 
-UNIT_TEST("steady_vector", "assoc()", "1 value", "read back"){
+QUARK_UNIT_TEST("steady_vector", "assoc()", "1 value", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector1();
 	const auto b = a.assoc(0, 1000);
-	TEST_VERIFY(a[0] == 7);
-	TEST_VERIFY(b[0] == 1000);
+	VERIFY(a[0] == 7);
+	VERIFY(b[0] == 1000);
 	a.trace_internals();
 }
 
 
-UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #0", "read back"){
+QUARK_UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #0", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_plus_1();
 	const auto b = a.assoc(0, 1000);
-	TEST_VERIFY(a[0] == 7);
-	TEST_VERIFY(b[0] == 1000);
+	VERIFY(a[0] == 7);
+	VERIFY(b[0] == 1000);
 }
 
-UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #4", "read back"){
+QUARK_UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #4", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_plus_1();
 	const auto b = a.assoc(4, 1000);
-	TEST_VERIFY(a[0] == 7);
-	TEST_VERIFY(b[4] == 1000);
+	VERIFY(a[0] == 7);
+	VERIFY(b[4] == 1000);
 }
 
-UNIT_TEST("steady_vector", "assoc()", "17 value vector, replace bunch", "read back"){
+QUARK_UNIT_TEST("steady_vector", "assoc()", "17 value vector, replace bunch", "read back"){
 	test_fixture<int> f;
 	auto a = make_manual_vector_branchfactor_square_plus_1();
 	a = a.assoc(4, 1004);
@@ -1378,23 +1382,23 @@ UNIT_TEST("steady_vector", "assoc()", "17 value vector, replace bunch", "read ba
 	a = a.assoc(16, 1016);
 	a = a.assoc(10, 1010);
 
-	TEST_VERIFY(a[0] == 1000);
-	TEST_VERIFY(a[4] == 1004);
-	TEST_VERIFY(a[5] == 1005);
-	TEST_VERIFY(a[16] == 1016);
-	TEST_VERIFY(a[10] == 1010);
+	VERIFY(a[0] == 1000);
+	VERIFY(a[4] == 1004);
+	VERIFY(a[5] == 1005);
+	VERIFY(a[16] == 1016);
+	VERIFY(a[10] == 1010);
 
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace value 10000 times", "read back"){
+QUARK_UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace value 10000 times", "read back"){
 	test_fixture<int> f;
 	auto a = make_manual_vector_branchfactor_plus_1();
 
 	for(int i = 0 ; i < 1000 ; i++){
 		a = a.assoc(4, i);
 	}
-	TEST_VERIFY(a[4] == 999);
+	VERIFY(a[4] == 999);
 
 	a.trace_internals();
 }
@@ -1423,77 +1427,77 @@ namespace {
 		for(int i = 0 ; i < vec.size() ; i++){
 			const auto value = vec[i];
 			const auto expected = value0 + i;
-			TEST_VERIFY(value == expected);
+			VERIFY(value == expected);
 		}
 	}
 }
 
-UNIT_TEST("steady_vector", "push_back()", "one value => 1 leaf node", "read back"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "one value => 1 leaf node", "read back"){
 	test_fixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
-	TEST_VERIFY(a.size() == 0);
-	TEST_VERIFY(b.size() == 1);
-	TEST_VERIFY(b[0] == 4);
+	VERIFY(a.size() == 0);
+	VERIFY(b.size() == 1);
+	VERIFY(b[0] == 4);
 }
 
-UNIT_TEST("steady_vector", "push_back()", "two values => 1 leaf node", "read back"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "two values => 1 leaf node", "read back"){
 	test_fixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
 	const auto c = b.push_back(9);
 
-	TEST_VERIFY(a.size() == 0);
+	VERIFY(a.size() == 0);
 
-	TEST_VERIFY(b.size() == 1);
-	TEST_VERIFY(b[0] == 4);
+	VERIFY(b.size() == 1);
+	VERIFY(b[0] == 4);
 
-	TEST_VERIFY(c.size() == 2);
-	TEST_VERIFY(c[0] == 4);
-	TEST_VERIFY(c[1] == 9);
+	VERIFY(c.size() == 2);
+	VERIFY(c[0] == 4);
+	VERIFY(c[1] == 9);
 }
 
-UNIT_TEST("steady_vector", "push_back()", "1 inode", "read back"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "1 inode", "read back"){
 	test_fixture<int> f;
 	const auto count = BRANCHING_FACTOR + 1;
 	steady_vector<int> a = push_back_n(count, 1000);
-	TEST_VERIFY(a.size() == count);
+	VERIFY(a.size() == count);
 	test_values(a, 1000);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "read back all values"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "read back all values"){
 	test_fixture<int> f;
 	const auto count = BRANCHING_FACTOR + 2;
 	steady_vector<int> a = push_back_n(count, 1000);
-	TEST_VERIFY(a.size() == count);
+	VERIFY(a.size() == count);
 	test_values(a, 1000);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all values"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all values"){
 	test_fixture<int> f;
 	const auto count = BRANCHING_FACTOR * BRANCHING_FACTOR + 1;
 	steady_vector<int> a = push_back_n(count, 1000);
-	TEST_VERIFY(a.size() == count);
+	VERIFY(a.size() == count);
 	test_values(a, 1000);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all values"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all values"){
 	test_fixture<int> f;
 	const auto count = BRANCHING_FACTOR * BRANCHING_FACTOR * 2;
 	steady_vector<int> a = push_back_n(count, 1000);
-	TEST_VERIFY(a.size() == count);
+	VERIFY(a.size() == count);
 	test_values(a, 1000);
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to last node", "read back all values"){
+QUARK_UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to last node", "read back all values"){
 	test_fixture<int> f;
 	const auto count = BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR * 2;
 	steady_vector<int> a = push_back_n(count, 1000);
-	TEST_VERIFY(a.size() == count);
+	VERIFY(a.size() == count);
 	test_values(a, 1000);
 	a.trace_internals();
 }
@@ -1502,13 +1506,13 @@ UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to
 ////////////////////////////////////////////		steady_vector::pop_back()
 
 
-UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector"){
+QUARK_UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector"){
 	test_fixture<int> f;
 	const auto data = generate_numbers(4, 50, 50);
 	const auto data2 = std::vector<int>(&data[0], &data[data.size() - 1]);
 	const auto a = steady_vector<int>(data);
 	const auto b = a.pop_back();
-	TEST_VERIFY(b.to_vec() == data2);
+	VERIFY(b.to_vec() == data2);
 }
 
 
@@ -1516,31 +1520,31 @@ UNIT_TEST("steady_vector", "pop_back()", "basic", "correct result vector"){
 ////////////////////////////////////////////		steady_vector::operator==()
 
 
-UNIT_TEST("steady_vector", "operator==()", "empty vs empty", "true"){
+QUARK_UNIT_TEST("steady_vector", "operator==()", "empty vs empty", "true"){
 	test_fixture<int> f;
 
 	const std::vector<int> a;
 	const std::vector<int> b;
-	TEST_VERIFY(a == b);
+	VERIFY(a == b);
 }
 
-UNIT_TEST("steady_vector", "operator==()", "empty vs 1", "false"){
+QUARK_UNIT_TEST("steady_vector", "operator==()", "empty vs 1", "false"){
 	test_fixture<int> f;
 
 	const std::vector<int> a;
 	const std::vector<int> b{ 33 };
-	TEST_VERIFY(!(a == b));
+	VERIFY(!(a == b));
 }
 
-UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "true"){
+QUARK_UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "true"){
 	test_fixture<int> f;
 	const auto data = generate_numbers(4, 50, 50);
 	const std::vector<int> a(data);
 	const std::vector<int> b(data);
-	TEST_VERIFY(a == b);
+	VERIFY(a == b);
 }
 
-UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
+QUARK_UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
 	test_fixture<int> f;
 	const auto data = generate_numbers(4, 50, 50);
 	auto data2 = data;
@@ -1548,7 +1552,7 @@ UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
 
 	const std::vector<int> a(data);
 	const std::vector<int> b(data2);
-	TEST_VERIFY(!(a == b));
+	VERIFY(!(a == b));
 }
 
 
@@ -1557,16 +1561,16 @@ UNIT_TEST("steady_vector", "operator==()", "1000 vs 1000", "false"){
 
 
 
-UNIT_TEST("steady_vector", "size()", "empty vector", "0"){
+QUARK_UNIT_TEST("steady_vector", "size()", "empty vector", "0"){
 	test_fixture<int> f;
 	steady_vector<int> v;
-	TEST_VERIFY(v.size() == 0);
+	VERIFY(v.size() == 0);
 }
 
-UNIT_TEST("steady_vector", "size()", "BranchFactorSquarePlus1", "BranchFactorSquarePlus1"){
+QUARK_UNIT_TEST("steady_vector", "size()", "BranchFactorSquarePlus1", "BranchFactorSquarePlus1"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_square_plus_1();
-	TEST_VERIFY(a.size() == BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
+	VERIFY(a.size() == BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
 }
 
 
@@ -1575,115 +1579,115 @@ UNIT_TEST("steady_vector", "size()", "BranchFactorSquarePlus1", "BranchFactorSqu
 
 
 
-UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "0 values", "empty"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "0 values", "empty"){
 	test_fixture<int> f;
 	const std::vector<int> a = {};
 	steady_vector<int> v(a);
-	TEST_VERIFY(v.size() == 0);
+	VERIFY(v.size() == 0);
 }
 
-UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "7 values", "read back all"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "7 values", "read back all"){
 	test_fixture<int> f;
 	const std::vector<int> a = {	3, 4, 5, 6, 7, 8, 9	};
 	steady_vector<int> v(a);
-	TEST_VERIFY(v.size() == 7);
-	TEST_VERIFY(v[0] == 3);
-	TEST_VERIFY(v[1] == 4);
-	TEST_VERIFY(v[2] == 5);
-	TEST_VERIFY(v[3] == 6);
-	TEST_VERIFY(v[4] == 7);
-	TEST_VERIFY(v[5] == 8);
-	TEST_VERIFY(v[6] == 9);
+	VERIFY(v.size() == 7);
+	VERIFY(v[0] == 3);
+	VERIFY(v[1] == 4);
+	VERIFY(v[2] == 5);
+	VERIFY(v[3] == 6);
+	VERIFY(v[4] == 7);
+	VERIFY(v[5] == 8);
+	VERIFY(v[6] == 9);
 }
 
 
 ////////////////////////////////////////////		steady_vector::steady_vector(const T values[], size_t count)
 
 
-UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "0 values", "empty"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "0 values", "empty"){
 	test_fixture<int> f;
 	const int a[] = {};
 	steady_vector<int> v(&a[0], 0);
-	TEST_VERIFY(v.size() == 0);
+	VERIFY(v.size() == 0);
 }
 
 
-UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "7 values", "read back all"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "7 values", "read back all"){
 	test_fixture<int> f;
 	const int a[] = {	3, 4, 5, 6, 7, 8, 9	};
 	steady_vector<int> v(&a[0], 7);
-	TEST_VERIFY(v.size() == 7);
-	TEST_VERIFY(v[0] == 3);
-	TEST_VERIFY(v[1] == 4);
-	TEST_VERIFY(v[2] == 5);
-	TEST_VERIFY(v[3] == 6);
-	TEST_VERIFY(v[4] == 7);
-	TEST_VERIFY(v[5] == 8);
-	TEST_VERIFY(v[6] == 9);
+	VERIFY(v.size() == 7);
+	VERIFY(v[0] == 3);
+	VERIFY(v[1] == 4);
+	VERIFY(v[2] == 5);
+	VERIFY(v[3] == 6);
+	VERIFY(v[4] == 7);
+	VERIFY(v[5] == 8);
+	VERIFY(v[6] == 9);
 }
 
 
 ////////////////////////////////////////////		steady_vector::steady_vector(std::initializer_list<T> args)
 
 
-UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "0 values", "empty"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "0 values", "empty"){
 	test_fixture<int> f;
 	steady_vector<int> v = {};
-	TEST_VERIFY(v.size() == 0);
+	VERIFY(v.size() == 0);
 }
 
 
-UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 values", "read back all"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 values", "read back all"){
 	test_fixture<int> f;
 	steady_vector<int> v = {	3, 4, 5, 6, 7, 8, 9	};
-	TEST_VERIFY(v.size() == 7);
-	TEST_VERIFY(v[0] == 3);
-	TEST_VERIFY(v[1] == 4);
-	TEST_VERIFY(v[2] == 5);
-	TEST_VERIFY(v[3] == 6);
-	TEST_VERIFY(v[4] == 7);
-	TEST_VERIFY(v[5] == 8);
-	TEST_VERIFY(v[6] == 9);
+	VERIFY(v.size() == 7);
+	VERIFY(v[0] == 3);
+	VERIFY(v[1] == 4);
+	VERIFY(v[2] == 5);
+	VERIFY(v[3] == 6);
+	VERIFY(v[4] == 7);
+	VERIFY(v[5] == 8);
+	VERIFY(v[6] == 9);
 }
 
 
 ////////////////////////////////////////////		steady_vector::to_vec()
 
 
-UNIT_TEST("steady_vector", "to_vec()", "0", "empty"){
+QUARK_UNIT_TEST("steady_vector", "to_vec()", "0", "empty"){
 	test_fixture<int> f;
 	const auto a = steady_vector<int>();
-	TEST_VERIFY(a.to_vec() == std::vector<int>());
+	VERIFY(a.to_vec() == std::vector<int>());
 }
 
-UNIT_TEST("steady_vector", "to_vec()", "50", "correct data"){
+QUARK_UNIT_TEST("steady_vector", "to_vec()", "50", "correct data"){
 	test_fixture<int> f;
 	const auto data = generate_numbers(4, 50, 50);
 	const auto a = steady_vector<int>(data);
-	TEST_VERIFY(a.to_vec() == data);
+	VERIFY(a.to_vec() == data);
 }
 
 
 ////////////////////////////////////////////		steady_vector::steady_vector(const steady_vector& rhs)
 
 
-UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "empty", "empty"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "empty", "empty"){
 	test_fixture<int> f;
 	const auto a = steady_vector<int>();
 	const auto b(a);
-	TEST_VERIFY(a.empty());
-	TEST_VERIFY(b.empty());
+	VERIFY(a.empty());
+	VERIFY(b.empty());
 }
 
-UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 values", "identical, sharing root"){
+QUARK_UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 values", "identical, sharing root"){
 	test_fixture<int> f;
 	const auto data = std::vector<int>{	3, 4, 5, 6, 7, 8, 9	};
 	const steady_vector<int> a = data;
 	const auto b(a);
 
-	TEST_VERIFY(a.to_vec() == data);
-	TEST_VERIFY(b.to_vec() == data);
-	TEST_VERIFY(a.get_root()._leaf == b.get_root()._leaf);
+	VERIFY(a.to_vec() == data);
+	VERIFY(b.to_vec() == data);
+	VERIFY(a.get_root()._leaf == b.get_root()._leaf);
 }
 
 
@@ -1692,18 +1696,18 @@ UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 values"
 
 
 
-UNIT_TEST("steady_vector", "operator=()", "empty", "empty"){
+QUARK_UNIT_TEST("steady_vector", "operator=()", "empty", "empty"){
 	test_fixture<int> f;
 	const auto a = steady_vector<int>();
 	auto b = steady_vector<int>();
 
 	b = a;
 
-	TEST_VERIFY(a.empty());
-	TEST_VERIFY(b.empty());
+	VERIFY(a.empty());
+	VERIFY(b.empty());
 }
 
-UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing root"){
+QUARK_UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing root"){
 	test_fixture<int> f;
 	const auto data = std::vector<int>{	3, 4, 5, 6, 7, 8, 9	};
 	const steady_vector<int> a = data;
@@ -1711,9 +1715,9 @@ UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing root")
 
 	b = a;
 
-	TEST_VERIFY(a.to_vec() == data);
-	TEST_VERIFY(b.to_vec() == data);
-	TEST_VERIFY(a.get_root()._leaf == b.get_root()._leaf);
+	VERIFY(a.to_vec() == data);
+	VERIFY(b.to_vec() == data);
+	VERIFY(a.get_root()._leaf == b.get_root()._leaf);
 }
 
 }	//	steady

@@ -22,6 +22,31 @@
 
 namespace quark {
 
+#if false
+
+//	FUTURE
+//	====================================================================================================================
+
+
+	/**
+		Use 7-bit english text as lookup key.
+		Returns localized utf8 text.
+		Basic implementations can chose to just return the lookup key.
+		addKey is additional characters to use for lookup, but that is not part of the actual returned-text if no localization exists.
+	*/
+	public: virtual std::string runtime_i__lookup_text(const source_code_location& location,
+		const int locale,
+		const char englishLookupKey[],
+		const char addKey[]) = 0;
+
+
+	public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]) = 0;
+	public: virtual void runtime_i__on_dbc_precondition_failed(const char s[]) = 0;
+	public: virtual void runtime_i__on_dbc_postcondition_failed(const char s[]) = 0;
+	public: virtual void runtime_i__on_dbc_invariant_failed(const char s[]) = 0;
+#endif
+
+
 
 //	PRIMITIVES
 //	====================================================================================================================
@@ -32,7 +57,7 @@ namespace quark {
 
 
 
-////////////////////////////		TSourceLocation
+////////////////////////////		source_code_location
 
 
 /**
@@ -41,21 +66,21 @@ namespace quark {
 
 
 
-struct TSourceLocation {
-	TSourceLocation(const char iSourceFile[], long iLineNumber) :
-		fLineNumber(iLineNumber)
+struct source_code_location {
+	source_code_location(const char source_file[], long line_number) :
+		_line_number(line_number)
 	{
-		assert(iSourceFile != nullptr);
-		assert(std::strlen(iSourceFile) <= 1024);
-		strcpy(fSourceFile, iSourceFile);
+		assert(source_file != nullptr);
+		assert(std::strlen(source_file) <= 1024);
+		strcpy(_source_file, source_file);
 	}
 
-	char fSourceFile[1024 + 1];
-	long fLineNumber;
+	char _source_file[1024 + 1];
+	long _line_number;
 };
 
 
-////////////////////////////		icppextension_runtime
+////////////////////////////		runtime_i
 
 
 /**
@@ -63,42 +88,24 @@ struct TSourceLocation {
 */
 
 
-class icppextension_runtime {
-	public: virtual ~icppextension_runtime(){};
-	public: virtual void icppextension_runtime__trace(const char s[]) = 0;
-	public: virtual void icppextension_runtime__add_log_indent(long iAdd) = 0;
-	public: virtual void icppextension_runtime__on_assert(const TSourceLocation& iLocation, const char iExpression[]) = 0;
-	public: virtual void icppextension_runtime__on_unit_test_failed(const TSourceLocation& iLocation, const char s[]) = 0;
-
-	/**
-		Use 7-bit english text as lookup key.
-		Returns localized utf8 text.
-		Basic implementations can chose to just return the lookup key.
-		addKey is additional characters to use for lookup, but that is not part of the actual returned-text if no localization exists.
-	*/
-/*
-	public: virtual std::string icppextension_runtime__lookup_text(const TSourceLocation& iLocation,
-		const int locale,
-		const char englishLookupKey[],
-		const char addKey[]) = 0;
-
-*/
-//	public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]) = 0;
-//	public: virtual void icppextension_runtime__on_dbc_precondition_failed(const char s[]) = 0;
-//	public: virtual void icppextension_runtime__on_dbc_postcondition_failed(const char s[]) = 0;
-//	public: virtual void icppextension_runtime__on_dbc_invariant_failed(const char s[]) = 0;
+class runtime_i {
+	public: virtual ~runtime_i(){};
+	public: virtual void runtime_i__trace(const char s[]) = 0;
+	public: virtual void runtime_i__add_log_indent(long add) = 0;
+	public: virtual void runtime_i__on_assert(const source_code_location& location, const char expression[]) = 0;
+	public: virtual void runtime_i__on_unit_test_failed(const source_code_location& location, const char s[]) = 0;
 };
 
 
-////////////////////////////		GetRuntime() and SetRuntime()
+////////////////////////////		get_runtime() and set_runtime()
 
 /**
 	Global functions for storing the current runtime.
 	Notice that only the macros use these! The implementation does NOT.
 */
 
-icppextension_runtime* GetRuntime();
-void SetRuntime(icppextension_runtime* iRuntime);
+runtime_i* get_runtime();
+void set_runtime(runtime_i* iRuntime);
 
 
 
@@ -145,15 +152,15 @@ void SetRuntime(icppextension_runtime* iRuntime);
 
 #if QUARK__ASSERT_ON
 
-void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]) __dead2;
+void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]) __dead2;
 
-#define ASSERT(x) if(x){}else {::quark::OnAssertHook(::quark::GetRuntime(), quark::TSourceLocation(__FILE__, __LINE__), PP_STRING(x)); }
+#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), PP_STRING(x)); }
 
-#define ASSERT_UNREACHABLE ASSERT(false)
+#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)
 #else
 
-#define ASSERT(x)
-#define ASSERT_UNREACHABLE throw std::logic_error("")
+#define QUARK_ASSERT(x)
+#define QUARK_ASSERT_UNREACHABLE throw std::logic_error("")
 
 #endif
 
@@ -167,63 +174,63 @@ void OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocat
 
 
 
-////////////////////////////		CScopedTrace
+////////////////////////////		scoped_trace
 
 /**
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
-struct CScopedTrace {
-	CScopedTrace(const char s[]){
+struct scoped_trace {
+	scoped_trace(const char s[]){
 #if QUARK__TRACE_ON
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__trace(s);
-		r->icppextension_runtime__trace("{");
-		r->icppextension_runtime__add_log_indent(1);
+		runtime_i* r = get_runtime();
+		r->runtime_i__trace(s);
+		r->runtime_i__trace("{");
+		r->runtime_i__add_log_indent(1);
 #endif
 	}
-	CScopedTrace(const std::string& s){
+	scoped_trace(const std::string& s){
 #if QUARK__TRACE_ON
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__trace(s.c_str());
-		r->icppextension_runtime__trace("{");
-		r->icppextension_runtime__add_log_indent(1);
+		runtime_i* r = get_runtime();
+		r->runtime_i__trace(s.c_str());
+		r->runtime_i__trace("{");
+		r->runtime_i__add_log_indent(1);
 #endif
 	}
-	CScopedTrace(const std::stringstream& s){
+	scoped_trace(const std::stringstream& s){
 #if QUARK__TRACE_ON
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__trace(s.str().c_str());
-		r->icppextension_runtime__trace("{");
-		r->icppextension_runtime__add_log_indent(1);
+		runtime_i* r = get_runtime();
+		r->runtime_i__trace(s.str().c_str());
+		r->runtime_i__trace("{");
+		r->runtime_i__add_log_indent(1);
 #endif
 	}
-	~CScopedTrace(){
+	~scoped_trace(){
 #if QUARK__TRACE_ON
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__add_log_indent(-1);
-		r->icppextension_runtime__trace("}");
+		runtime_i* r = get_runtime();
+		r->runtime_i__add_log_indent(-1);
+		r->runtime_i__trace("}");
 #endif
 	}
 };
 
 
-////////////////////////////		CScopedIndent
+////////////////////////////		scoped_trace_indent
 
 
 /**
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
-struct CScopedIndent {
+struct scoped_trace_indent {
 #if QUARK__TRACE_ON
-	CScopedIndent(){
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__add_log_indent(1);
+	scoped_trace_indent(){
+		runtime_i* r = get_runtime();
+		r->runtime_i__add_log_indent(1);
 	}
-	~CScopedIndent(){
-		icppextension_runtime* r = GetRuntime();
-		r->icppextension_runtime__add_log_indent(-1);
+	~scoped_trace_indent(){
+		runtime_i* r = get_runtime();
+		r->runtime_i__add_log_indent(-1);
 	}
 #endif
 };
@@ -234,39 +241,38 @@ struct CScopedIndent {
 ////////////////////////////		Hook functions.
 
 /**
-	These functions are called by the macros and they in turn call the icppextension_runtime.
+	These functions are called by the macros and they in turn call the runtime_i.
 */
 
 
-void OnTraceHook(icppextension_runtime* iRuntime, const char iS[]);
-void OnTraceHook(icppextension_runtime* iRuntime, const std::string& iS);
-void OnTraceHook(icppextension_runtime* iRuntime, const std::stringstream& iS);
+void on_trace_hook(runtime_i* runtime, const char s[]);
+void on_trace_hook(runtime_i* runtime, const std::string& s);
+void on_trace_hook(runtime_i* runtime, const std::stringstream& s);
 
 
 //	### Use runtime as explicit argument instead?
-#define TRACE(s) ::quark::OnTraceHook(::quark::GetRuntime(), s)
-#define TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::OnTraceHook(::quark::GetRuntime(), ss);}
+#define QUARK_TRACE(s) ::quark::on_trace_hook(::quark::get_runtime(), s)
+#define QUARK_TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::on_trace_hook(::quark::get_runtime(), ss);}
 
 /**
 	Works with:
 		char[]
 		std::string
 */
-#define SCOPED_TRACE(s) ::quark::CScopedTrace PP_UNIQUE_LABEL(scoped_trace) (s)
-#define SCOPED_INDENT() ::quark::CScopedIndent PP_UNIQUE_LABEL(scoped_indent)
+#define QUARK_SCOPED_TRACE(s) ::quark::scoped_trace PP_UNIQUE_LABEL(scoped_trace) (s)
+#define QUARK_SCOPED_INDENT() ::quark::scoped_trace_indent PP_UNIQUE_LABEL(scoped_indent)
 
-#define TRACE_FUNCTION() ::quark::CScopedTrace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
+#define QUARK_TRACE_FUNCTION() ::quark::scoped_trace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
 
 
 #else
 
-#define TRACE(s)
-#define TRACE_SS(s)
+#define QUARK_TRACE(s)
+#define QUARK_TRACE_SS(s)
 
-#define SCOPED_TRACE(s)
-#define SCOPED_INDENT()
-#define TRACE_FUNCTION()
-
+#define QUARK_SCOPED_TRACE(s)
+#define QUARK_SCOPED_INDENT()
+#define QUARK_TRACE_FUNCTION()
 
 #endif
 
@@ -350,8 +356,8 @@ struct TUnitTestReg {
 
 
 
-void OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation& iLocation, const char iExpression[]);
-std::string OnGetPrivateTestDataPath(icppextension_runtime* iRuntime, const char iModuleUnderTest[], const char iSourceFilePath[]);
+void OnUnitTestFailedHook(runtime_i* iRuntime, const source_code_location& location, const char iExpression[]);
+std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char iModuleUnderTest[], const char source_file_path[]);
 
 
 
@@ -372,33 +378,33 @@ void run_tests();
 
 
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
-#define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
+#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)(); \
 	static ::quark::TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
 //### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
-#define UT_VERIFY(exp) if(exp){}else{ ::quark::OnUnitTestFailedHook(::quark::GetRuntime(), ::quark::TSourceLocation(__FILE__, __LINE__), PP_STRING(exp)); }
+#define QUARK_UT_VERIFY(exp) if(exp){}else{ ::quark::OnUnitTestFailedHook(::quark::get_runtime(), ::quark::source_code_location(__FILE__, __LINE__), PP_STRING(exp)); }
 
-#define TEST_VERIFY UT_VERIFY
+#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
 
 
 /**
 	gives you native, absolute path to your modules test-directory.
 */
-//#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(GetRuntime(), moduleUnderTest, __FILE__)
+//#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(get_runtime(), moduleUnderTest, __FILE__)
 
 #else
 
 
 
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
-#define UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
+#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
 	void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
-#define UT_VERIFY(exp)
-#define TEST_VERIFY UT_VERIFY
+#define QUARK_UT_VERIFY(exp)
+#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
 
 #endif
@@ -419,18 +425,18 @@ void run_tests();
 //////////////////////////////////			TDefaultRuntime
 
 /**
-	This is a default implementation that client can chose to instantiate and plug-in using SetRuntime().
+	This is a default implementation that client can chose to instantiate and plug-in using set_runtime().
 
 	It uses cout.
 */
 
-struct TDefaultRuntime : public icppextension_runtime {
+struct TDefaultRuntime : public runtime_i {
 	TDefaultRuntime(const std::string& iTestDataRoot);
 
-	public: virtual void icppextension_runtime__trace(const char s[]);
-	public: virtual void icppextension_runtime__add_log_indent(long iAdd);
-	public: virtual void icppextension_runtime__on_assert(const TSourceLocation& iLocation, const char iExpression[]);
-	public: virtual void icppextension_runtime__on_unit_test_failed(const TSourceLocation& iLocation, const char iExpression[]);
+	public: virtual void runtime_i__trace(const char s[]);
+	public: virtual void runtime_i__add_log_indent(long iAdd);
+	public: virtual void runtime_i__on_assert(const source_code_location& location, const char iExpression[]);
+	public: virtual void runtime_i__on_unit_test_failed(const source_code_location& location, const char iExpression[]);
 //	public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]);
 
 

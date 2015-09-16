@@ -10,28 +10,12 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "steady/quark.cpp"
-            timestampString = "464106398.887664"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "53"
-            endingLineNumber = "53"
-            landmarkName = "OnAssertHook(icppextension_runtime* iRuntime, const TSourceLocation&amp; iLocation, const char iExpression[])"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "steady/quark.cpp"
-            timestampString = "464106398.887664"
+            timestampString = "464108648.255446"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "106"
             endingLineNumber = "106"
-            landmarkName = "OnUnitTestFailedHook(icppextension_runtime* iRuntime, const TSourceLocation&amp; iLocation, const char iExpression[])"
+            landmarkName = "OnUnitTestFailedHook(runtime_i* iRuntime, const source_code_location&amp; location, const char expression[])"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
