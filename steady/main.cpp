@@ -17,7 +17,7 @@
 
 
 void Example(){
-	steady_vector<int> a;
+	steady::steady_vector<int> a;
 	a = a.push_back(3);
 	a = a.push_back(8);
 	a = a.push_back(11);

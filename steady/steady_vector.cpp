@@ -16,6 +16,15 @@ NOW
 ====================================================================================================================
 ### optimize pop_back()
 
+### Add append() function.
+### Append leaf by leaf.
+
+### Fix namepsace
+### Name library
+### clean up cpp_extensions
+### Unify code naming conventions: all lower cases.
+### Write docs on public functions.
+
 
 NEXT
 ====================================================================================================================
@@ -29,6 +38,9 @@ rest()
 
 SOMEDAY
 ====================================================================================================================
+
+### Make memory allocation hookable.
+
 Store shift in steady_vector to avoid recomputing it all the time.
 
 subvec - no trimming = very fast.
@@ -44,7 +56,7 @@ Over-alloc / reserve nodes?
 
 ??? Path copying requires 31 * 6 RC-bumps!
 
-### Use placement-now in leaf nodes to avoid default-constructing all leaf node items.
+### Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
 
 ### Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
 
@@ -58,9 +70,10 @@ Over-alloc / reserve nodes?
 
 
 
+namespace steady {
 
 
-
+namespace internals {
 ////////////////////////////////////////////		LeafNode
 
 
@@ -135,28 +148,28 @@ namespace {
 
 		if(vec.size() > 0){
 			const auto type = vec[0].GetType();
-			if(type == kNullNode){
+			if(type == NodeType::kNullNode){
 				for(auto i: vec){
-					ASSERT(i.GetType() == kNullNode);
+					ASSERT(i.GetType() == NodeType::kNullNode);
 				}
 			}
-			else if(type == kInode){
+			else if(type == NodeType::kInode){
 				int i = 0;
-				while(i < vec.size() && vec[i].GetType() == kInode){
+				while(i < vec.size() && vec[i].GetType() == NodeType::kInode){
 					i++;
 				}
 				while(i < vec.size()){
-					ASSERT(vec[i].GetType() == kNullNode);
+					ASSERT(vec[i].GetType() == NodeType::kNullNode);
 					i++;
 				}
 			}
-			else if(type == kLeafNode){
+			else if(type == NodeType::kLeafNode){
 				int i = 0;
-				while(i < vec.size() && vec[i].GetType() == kLeafNode){
+				while(i < vec.size() && vec[i].GetType() == NodeType::kLeafNode){
 					i++;
 				}
 				while(i < vec.size()){
-					ASSERT(vec[i].GetType() == kNullNode);
+					ASSERT(vec[i].GetType() == NodeType::kNullNode);
 					i++;
 				}
 			}
@@ -234,7 +247,7 @@ struct INode {
 		ASSERT(check_invariant());
 
 		size_t index = 0;
-		while(index < _children.size() && _children[index].GetType() != kNullNode){
+		while(index < _children.size() && _children[index].GetType() != NodeType::kNullNode){
 			index++;
 		}
 		return index;
@@ -257,7 +270,7 @@ struct INode {
 		ASSERT(check_invariant());
 		ASSERT(index < _children.size());
 
-		ASSERT(_children[0].GetType() == kLeafNode);
+		ASSERT(_children[0].GetType() == NodeType::kLeafNode);
 		return _children[index]._leaf;
 	}
 
@@ -327,13 +340,13 @@ NodeRef<T>::NodeRef(const NodeRef<T>& ref) :
 {
 	ASSERT(ref.check_invariant());
 
-	if(ref.GetType() == kNullNode){
+	if(ref.GetType() == NodeType::kNullNode){
 	}
-	else if(ref.GetType() == kInode){
+	else if(ref.GetType() == NodeType::kInode){
 		_inode = ref._inode;
 		_inode->_rc++;
 	}
-	else if(ref.GetType() == kLeafNode){
+	else if(ref.GetType() == NodeType::kLeafNode){
 		_leaf = ref._leaf;
 		_leaf->_rc++;
 	}
@@ -348,16 +361,16 @@ template <typename T>
 NodeRef<T>::~NodeRef(){
 	ASSERT(check_invariant());
 
-	if(GetType() == kNullNode){
+	if(GetType() == NodeType::kNullNode){
 	}
-	else if(GetType() == kInode){
+	else if(GetType() == NodeType::kInode){
 		_inode->_rc--;
 		if(_inode->_rc == 0){
 			delete _inode;
 			_inode = nullptr;
 		}
 	}
-	else if(GetType() == kLeafNode){
+	else if(GetType() == NodeType::kLeafNode){
 		_leaf->_rc--;
 		if(_leaf->_rc == 0){
 			delete _leaf;
@@ -415,13 +428,13 @@ NodeType NodeRef<T>::GetType() const {
 	ASSERT(_inode == nullptr || _leaf == nullptr);
 
 	if(_inode == nullptr && _leaf == nullptr){
-		return kNullNode;
+		return NodeType::kNullNode;
 	}
 	else if(_inode != nullptr){
-		return kInode;
+		return NodeType::kInode;
 	}
 	else if(_leaf != nullptr){
-		return kLeafNode;
+		return NodeType::kLeafNode;
 	}
 	else{
 		ASSERT_UNREACHABLE;
@@ -440,6 +453,11 @@ int INode<T>::_debug_count = 0;
 
 template <class T>
 int LeafNode<T>::_debug_count = 0;
+
+
+}	//	internals
+
+using namespace internals;
 
 
 
@@ -520,10 +538,10 @@ namespace {
 		ASSERT(tree.check_invariant());
 	#if DEBUG
 		if(size == 0){
-			ASSERT(tree.GetType() == kNullNode);
+			ASSERT(tree.GetType() == NodeType::kNullNode);
 		}
 		else{
-			ASSERT(tree.GetType() != kNullNode);
+			ASSERT(tree.GetType() != NodeType::kNullNode);
 		}
 	#endif
 		return true;
@@ -547,7 +565,7 @@ namespace {
 		}
 
 		ASSERT(shift == 0);
-		ASSERT(nodeIt.GetType() == kLeafNode);
+		ASSERT(nodeIt.GetType() == NodeType::kLeafNode);
 		return nodeIt;
 	}
 
@@ -563,11 +581,11 @@ namespace {
 	*/
 	template <class T>
 	NodeRef<T> modify_existing_value(const NodeRef<T>& node, int shift, size_t index, const T& value){
-		ASSERT(node.GetType() == kInode || node.GetType() == kLeafNode);
+		ASSERT(node.GetType() == NodeType::kInode || node.GetType() == NodeType::kLeafNode);
 
 		const size_t slotIndex = (index >> shift) & kBranchingFactorMask;
 		if(shift == 0){
-			ASSERT(node.GetType() == kLeafNode);
+			ASSERT(node.GetType() == NodeType::kLeafNode);
 
 			auto copy = NodeRef<T>(new LeafNode<T>(node._leaf->_values));
 			ASSERT(slotIndex < copy._leaf->_values.size());
@@ -575,7 +593,7 @@ namespace {
 			return copy;
 		}
 		else{
-			ASSERT(node.GetType() == kInode);
+			ASSERT(node.GetType() == NodeType::kInode);
 
 			const auto child = node._inode->GetChild(slotIndex);
 			auto childCopy = modify_existing_value(child, shift - kBranchingFactorShift, index, value);
@@ -622,16 +640,15 @@ steady_vector<T>::steady_vector(const std::vector<T>& vec) :
 	ASSERT(check_invariant());
 }
 
-
 template <class T>
-steady_vector<T>::steady_vector(const T entries[], size_t count) :
+steady_vector<T>::steady_vector(const T values[], size_t count) :
 	_size(0)
 {
-	ASSERT(entries != nullptr);
+	ASSERT(values != nullptr);
 
 	steady_vector<T> temp;
 	for(size_t i = 0 ; i < count ; i++){
-		temp = temp.push_back(entries[i]);
+		temp = temp.push_back(values[i]);
 	}
 
 	steady_vector<T> temp2 = temp;
@@ -663,7 +680,7 @@ steady_vector<T>::~steady_vector(){
 
 template <class T>
 bool steady_vector<T>::check_invariant() const{
-	if(_root.GetType() == kNullNode){
+	if(_root.GetType() == NodeType::kNullNode){
 		ASSERT(_size == 0);
 	}
 	else{
@@ -752,9 +769,9 @@ namespace  {
 	template <class T>
 	NodeRef<T> append_leaf_node(const NodeRef<T>& original, int shift, size_t index, const NodeRef<T>& append){
 		ASSERT(original.check_invariant());
-		ASSERT(original.GetType() == kInode);
+		ASSERT(original.GetType() == NodeType::kInode);
 		ASSERT(append.check_invariant());
-		ASSERT(append.GetType() == kLeafNode);
+		ASSERT(append.GetType() == NodeType::kLeafNode);
 
 		size_t slotIndex = (index >> shift) & kBranchingFactorMask;
 		auto children = original._inode->GetChildrenWithNulls();
@@ -766,7 +783,7 @@ namespace  {
 		}
 		else {
 			const auto child = children[slotIndex];
-			if(child.GetType() == kNullNode){
+			if(child.GetType() == NodeType::kNullNode){
 				NodeRef<T> child2 = make_new_path(shift - kBranchingFactorShift, append);
 				children[slotIndex] = child2;
 				return MakeINodeFromArray<T>(children);
@@ -841,9 +858,16 @@ template <class T>
 bool steady_vector<T>::operator==(const steady_vector& rhs) const{
 	ASSERT(check_invariant());
 
-	const auto a = to_vec();
-	const auto b = rhs.to_vec();
-	return a == b;
+	if(_size == rhs._size && _root._leaf == rhs._leaf && _root._inode == rhs._root._inode){
+		return true;
+	}
+	else{
+		//	### optimize by comparing leaf node by leaf node.
+		//	First check leaf-node to see if they are the same pointer. If not, compary their values.
+		const auto a = to_vec();
+		const auto b = rhs.to_vec();
+		return a == b;
+	}
 }
 
 
@@ -897,10 +921,10 @@ std::vector<T> steady_vector<T>::to_vec() const{
 namespace {
 	template <class T>
 	void trace_node(const std::string& prefix, const NodeRef<T>& node){
-		if(node.GetType() == kNullNode){
+		if(node.GetType() == NodeType::kNullNode){
 			TRACE_SS(prefix << "<null>");
 		}
-		else if(node.GetType() == kInode){
+		else if(node.GetType() == NodeType::kInode){
 			TRACE_SS(prefix << "<inode> RC: " << node._inode->_rc);
 			SCOPED_INDENT();
 			int index = 0;
@@ -909,7 +933,7 @@ namespace {
 				index++;
 			}
 		}
-		else if(node.GetType() == kLeafNode){
+		else if(node.GetType() == NodeType::kLeafNode){
 			TRACE_SS(prefix << "<leaf> RC: " << node._leaf->_rc);
 			SCOPED_INDENT();
 			int index = 0;
@@ -1076,7 +1100,7 @@ UNIT_TEST("", "MakeManualVectorWith1()", "", "correct nodes"){
 
 	const auto a = MakeManualVectorWith1();
 	TEST_VERIFY(a.size() == 1);
-	TEST_VERIFY(a.GetRoot().GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot().GetType() == NodeType::kLeafNode);
 	TEST_VERIFY(a.GetRoot()._leaf->_rc == 1);
 	TEST_VERIFY(a.GetRoot()._leaf->_values[0] == 7);
 	for(int i = 1 ; i < kBranchingFactor ; i++){
@@ -1096,7 +1120,7 @@ UNIT_TEST("", "MakeManualVectorWith2()", "", "correct nodes"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWith2();
 	TEST_VERIFY(a.size() == 2);
-	TEST_VERIFY(a.GetRoot().GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot().GetType() == NodeType::kLeafNode);
 	TEST_VERIFY(a.GetRoot()._leaf->_rc == 1);
 	TEST_VERIFY(a.GetRoot()._leaf->_values[0] == 7);
 	TEST_VERIFY(a.GetRoot()._leaf->_values[1] == 8);
@@ -1122,11 +1146,11 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorPlus1()", "", "correct nodes"){
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	TEST_VERIFY(a.size() == kBranchingFactor + 1);
 
-	TEST_VERIFY(a.GetRoot().GetType() == kInode);
+	TEST_VERIFY(a.GetRoot().GetType() == NodeType::kInode);
 	TEST_VERIFY(a.GetRoot()._inode->_rc == 1);
 	TEST_VERIFY(a.GetRoot()._inode->GetChildCountSkipNulls() == 2);
-	TEST_VERIFY(a.GetRoot()._inode->GetChild(0).GetType() == kLeafNode);
-	TEST_VERIFY(a.GetRoot()._inode->GetChild(1).GetType() == kLeafNode);
+	TEST_VERIFY(a.GetRoot()._inode->GetChild(0).GetType() == NodeType::kLeafNode);
+	TEST_VERIFY(a.GetRoot()._inode->GetChild(1).GetType() == NodeType::kLeafNode);
 
 	const auto leaf0 = a.GetRoot()._inode->GetChildLeafNode(0);
 	TEST_VERIFY(leaf0->_rc == 1);
@@ -1163,14 +1187,14 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct node
 	TEST_VERIFY(a.size() == kBranchingFactor * kBranchingFactor + 1);
 
 	NodeRef<int> rootINode = a.GetRoot();
-	TEST_VERIFY(rootINode.GetType() == kInode);
+	TEST_VERIFY(rootINode.GetType() == NodeType::kInode);
 	TEST_VERIFY(rootINode._inode->_rc == 2);
 	TEST_VERIFY(rootINode._inode->GetChildCountSkipNulls() == 2);
-	TEST_VERIFY(rootINode._inode->GetChild(0).GetType() == kInode);
-	TEST_VERIFY(rootINode._inode->GetChild(1).GetType() == kInode);
+	TEST_VERIFY(rootINode._inode->GetChild(0).GetType() == NodeType::kInode);
+	TEST_VERIFY(rootINode._inode->GetChild(1).GetType() == NodeType::kInode);
 
 	NodeRef<int> inodeA = rootINode._inode->GetChild(0);
-		TEST_VERIFY(inodeA.GetType() == kInode);
+		TEST_VERIFY(inodeA.GetType() == NodeType::kInode);
 		TEST_VERIFY(inodeA._inode->_rc == 2);
 		TEST_VERIFY(inodeA._inode->GetChildCountSkipNulls() == kBranchingFactor);
 		for(int i = 0 ; i < kBranchingFactor ; i++){
@@ -1180,10 +1204,10 @@ UNIT_TEST("", "MakeManualVectorWithBranchFactorSquarePlus1()", "", "correct node
 		}
 
 	NodeRef<int> inodeB = rootINode._inode->GetChild(1);
-		TEST_VERIFY(inodeB.GetType() == kInode);
+		TEST_VERIFY(inodeB.GetType() == NodeType::kInode);
 		TEST_VERIFY(inodeB._inode->_rc == 2);
 		TEST_VERIFY(inodeB._inode->GetChildCountSkipNulls() == 1);
-		TEST_VERIFY(inodeB._inode->GetChild(0).GetType() == kLeafNode);
+		TEST_VERIFY(inodeB._inode->GetChild(0).GetType() == NodeType::kLeafNode);
 
 		const auto leaf4 = inodeB._inode->GetChildLeafNode(0);
 		TEST_VERIFY(leaf4->_rc == 1);
@@ -1208,7 +1232,7 @@ UNIT_TEST("steady_vector", "steady_vector()", "", "no_assert"){
 ////////////////////////////////////////////		steady_vector::operator[]
 
 
-UNIT_TEST("steady_vector", "operator[]", "1 item", "read back"){
+UNIT_TEST("steady_vector", "operator[]", "1 value", "read back"){
 	TestFixture<int> f;
 
 	const auto a = MakeManualVectorWith1();
@@ -1216,7 +1240,7 @@ UNIT_TEST("steady_vector", "operator[]", "1 item", "read back"){
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 items", "read back"){
+UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 values", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	TEST_VERIFY(a[0] == 7);
@@ -1227,7 +1251,7 @@ UNIT_TEST("steady_vector", "operator[]", "Branchfactor + 1 items", "read back"){
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 items", "read back"){
+UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 values", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorSquarePlus1();
 	TEST_VERIFY(a[0] == 1000);
@@ -1255,7 +1279,7 @@ UNIT_TEST("steady_vector", "operator[]", "Branchfactor^2 + 1 items", "read back"
 
 
 
-UNIT_TEST("steady_vector", "assoc()", "1 item", "read back"){
+UNIT_TEST("steady_vector", "assoc()", "1 value", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWith1();
 	const auto b = a.assoc(0, 1000);
@@ -1265,7 +1289,7 @@ UNIT_TEST("steady_vector", "assoc()", "1 item", "read back"){
 }
 
 
-UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace #0", "read back"){
+UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #0", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	const auto b = a.assoc(0, 1000);
@@ -1273,7 +1297,7 @@ UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace #0", "read back"){
 	TEST_VERIFY(b[0] == 1000);
 }
 
-UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace #4", "read back"){
+UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace #4", "read back"){
 	TestFixture<int> f;
 	const auto a = MakeManualVectorWithBranchFactorPlus1();
 	const auto b = a.assoc(4, 1000);
@@ -1281,7 +1305,7 @@ UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace #4", "read back"){
 	TEST_VERIFY(b[4] == 1000);
 }
 
-UNIT_TEST("steady_vector", "assoc()", "17 item vector, replace bunch", "read back"){
+UNIT_TEST("steady_vector", "assoc()", "17 value vector, replace bunch", "read back"){
 	TestFixture<int> f;
 	auto a = MakeManualVectorWithBranchFactorSquarePlus1();
 	a = a.assoc(4, 1004);
@@ -1299,7 +1323,7 @@ UNIT_TEST("steady_vector", "assoc()", "17 item vector, replace bunch", "read bac
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "assoc()", "5 item vector, replace value 10000 times", "read back"){
+UNIT_TEST("steady_vector", "assoc()", "5 value vector, replace value 10000 times", "read back"){
 	TestFixture<int> f;
 	auto a = MakeManualVectorWithBranchFactorPlus1();
 
@@ -1340,7 +1364,7 @@ namespace {
 	}
 }
 
-UNIT_TEST("steady_vector", "push_back()", "one item => 1 leaf node", "read back"){
+UNIT_TEST("steady_vector", "push_back()", "one value => 1 leaf node", "read back"){
 	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
@@ -1349,7 +1373,7 @@ UNIT_TEST("steady_vector", "push_back()", "one item => 1 leaf node", "read back"
 	TEST_VERIFY(b[0] == 4);
 }
 
-UNIT_TEST("steady_vector", "push_back()", "two items => 1 leaf node", "read back"){
+UNIT_TEST("steady_vector", "push_back()", "two values => 1 leaf node", "read back"){
 	TestFixture<int> f;
 	const steady_vector<int> a;
 	const auto b = a.push_back(4);
@@ -1374,7 +1398,7 @@ UNIT_TEST("steady_vector", "push_back()", "1 inode", "read back"){
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "read back all items"){
+UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "read back all values"){
 	TestFixture<int> f;
 	const auto count = kBranchingFactor + 2;
 	steady_vector<int> a = push_back_n(count, 1000);
@@ -1383,7 +1407,7 @@ UNIT_TEST("steady_vector", "push_back()", "1 inode + add leaf to last node", "re
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all items"){
+UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all values"){
 	TestFixture<int> f;
 	const auto count = kBranchingFactor * kBranchingFactor + 1;
 	steady_vector<int> a = push_back_n(count, 1000);
@@ -1392,7 +1416,7 @@ UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes", "read back all i
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all items"){
+UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to last node", "read back all values"){
 	TestFixture<int> f;
 	const auto count = kBranchingFactor * kBranchingFactor * 2;
 	steady_vector<int> a = push_back_n(count, 1000);
@@ -1401,7 +1425,7 @@ UNIT_TEST("steady_vector", "push_back()", "2-levels of inodes + add leaf-node to
 	a.trace_internals();
 }
 
-UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to last node", "read back all items"){
+UNIT_TEST("steady_vector", "push_back()", "3-levels of inodes + add leaf-node to last node", "read back all values"){
 	TestFixture<int> f;
 	const auto count = kBranchingFactor * kBranchingFactor * kBranchingFactor * 2;
 	steady_vector<int> a = push_back_n(count, 1000);
@@ -1487,14 +1511,14 @@ UNIT_TEST("steady_vector", "size()", "BranchFactorSquarePlus1", "BranchFactorSqu
 
 
 
-UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "0 items", "empty"){
+UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "0 values", "empty"){
 	TestFixture<int> f;
 	const std::vector<int> a = {};
 	steady_vector<int> v(a);
 	TEST_VERIFY(v.size() == 0);
 }
 
-UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "7 items", "read back all"){
+UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "7 values", "read back all"){
 	TestFixture<int> f;
 	const std::vector<int> a = {	3, 4, 5, 6, 7, 8, 9	};
 	steady_vector<int> v(a);
@@ -1509,10 +1533,10 @@ UNIT_TEST("steady_vector", "steady_vector(const std::vector<T>& vec)", "7 items"
 }
 
 
-////////////////////////////////////////////		steady_vector::steady_vector(const T entries[], size_t count)
+////////////////////////////////////////////		steady_vector::steady_vector(const T values[], size_t count)
 
 
-UNIT_TEST("steady_vector", "steady_vector(const T entries[], size_t count)", "0 items", "empty"){
+UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "0 values", "empty"){
 	TestFixture<int> f;
 	const int a[] = {};
 	steady_vector<int> v(&a[0], 0);
@@ -1520,7 +1544,7 @@ UNIT_TEST("steady_vector", "steady_vector(const T entries[], size_t count)", "0 
 }
 
 
-UNIT_TEST("steady_vector", "steady_vector(const T entries[], size_t count)", "7 items", "read back all"){
+UNIT_TEST("steady_vector", "steady_vector(const T values[], size_t count)", "7 values", "read back all"){
 	TestFixture<int> f;
 	const int a[] = {	3, 4, 5, 6, 7, 8, 9	};
 	steady_vector<int> v(&a[0], 7);
@@ -1538,14 +1562,14 @@ UNIT_TEST("steady_vector", "steady_vector(const T entries[], size_t count)", "7 
 ////////////////////////////////////////////		steady_vector::steady_vector(std::initializer_list<T> args)
 
 
-UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "0 items", "empty"){
+UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "0 values", "empty"){
 	TestFixture<int> f;
 	steady_vector<int> v = {};
 	TEST_VERIFY(v.size() == 0);
 }
 
 
-UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 items", "read back all"){
+UNIT_TEST("steady_vector", "steady_vector(std::initializer_list<T> args)", "7 values", "read back all"){
 	TestFixture<int> f;
 	steady_vector<int> v = {	3, 4, 5, 6, 7, 8, 9	};
 	TEST_VERIFY(v.size() == 7);
@@ -1587,7 +1611,7 @@ UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "empty", "
 	TEST_VERIFY(b.empty());
 }
 
-UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 items", "identical, sharing root"){
+UNIT_TEST("steady_vector", "steady_vector(const steady_vector& rhs)", "7 values", "identical, sharing root"){
 	TestFixture<int> f;
 	const auto data = std::vector<int>{	3, 4, 5, 6, 7, 8, 9	};
 	const steady_vector<int> a = data;
@@ -1615,7 +1639,7 @@ UNIT_TEST("steady_vector", "operator=()", "empty", "empty"){
 	TEST_VERIFY(b.empty());
 }
 
-UNIT_TEST("steady_vector", "operator=()", "7 items", "identical, sharing root"){
+UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing root"){
 	TestFixture<int> f;
 	const auto data = std::vector<int>{	3, 4, 5, 6, 7, 8, 9	};
 	const steady_vector<int> a = data;
@@ -1627,3 +1651,5 @@ UNIT_TEST("steady_vector", "operator=()", "7 items", "identical, sharing root"){
 	TEST_VERIFY(b.to_vec() == data);
 	TEST_VERIFY(a.GetRoot()._leaf == b.GetRoot()._leaf);
 }
+
+}	//	steady
