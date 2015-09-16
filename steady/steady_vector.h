@@ -273,6 +273,9 @@ class steady_vector {
 	private: std::size_t _size;
 };
 
+template <class T>
+steady_vector<T> operator+(const steady_vector<T>& a, const steady_vector<T>& b);
+
 }	//	steady
 	
 #endif /* defined(__steady__steady_vector__) */

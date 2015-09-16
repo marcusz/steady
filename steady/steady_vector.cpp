@@ -19,7 +19,6 @@ NOW
 
 ### QUARK_-prefix and file names.
 
-### Add append() function.
 ### Append leaf by leaf.
 
 ### Fix namepsace
@@ -71,10 +70,10 @@ Over-alloc / reserve nodes?
 
 */
 
+//	Give QUARK macros shorter names
 #define ASSERT(x) QUARK_ASSERT(x)
 #define TRACE(x) QUARK_TRACE(x)
 #define TRACE_SS(x) QUARK_TRACE_SS(x)
-
 #define VERIFY(x) QUARK_TEST_VERIFY(x)
 
 
@@ -983,6 +982,18 @@ void steady_vector<T>::trace_internals() const{
 }
 
 
+//	### Optimization potential here.
+template <class T>
+steady_vector<T> operator+(const steady_vector<T>& a, const steady_vector<T>& b){
+	steady_vector<T> result = a;
+	for(size_t i = 0 ; i < b.size() ; i++){
+		result = result.push_back(b[i]);
+	}
+
+	ASSERT(result.size() == a.size() + b.size());
+	return result;
+}
+
 
 
 
@@ -1719,5 +1730,21 @@ QUARK_UNIT_TEST("steady_vector", "operator=()", "7 values", "identical, sharing 
 	VERIFY(b.to_vec() == data);
 	VERIFY(a.get_root()._leaf == b.get_root()._leaf);
 }
+
+
+
+
+QUARK_UNIT_TEST("steady_vector", "operator+()", "3 + 4 values", "7 values"){
+	test_fixture<int> f;
+	const steady_vector<int> a{ 2, 3, 4 };
+	const steady_vector<int> b{ 5, 6, 7, 8 };
+
+	const auto c = a + b;
+
+	VERIFY(c.to_vec() == (std::vector<int>{ 2, 3, 4, 5, 6, 7, 8 }));
+}
+
+
+
 
 }	//	steady

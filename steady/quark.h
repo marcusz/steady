@@ -1,6 +1,5 @@
 //
-//  cpp_extension.h
-//  steady
+//  quark.h
 //
 //  Created by Marcus Zetterquist on 2013-11-16.
 //  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
@@ -8,6 +7,94 @@
 
 #ifndef quark_h
 #define quark_h
+
+/*
+
+QUARK
+Why: the low-level bits standard C++ is missing. Tracing, asserts, unit tests. The guiding principle for quark is
+minimalism.
+
+
+TRACING
+------------------------------------------------------------------------------------------------------------------------
+Quark has primitives for tracing that can be routed and enabled / disabled. Includes support for indenting the log.
+Use QUARK__TRACE_ON to enable / disable tracing.
+
+Examples:
+
+	Trace a C string
+		QUARK_TRACE("abc");
+
+	Trace using << code
+		QUARK_TRACE_SS("my value" << 123);
+
+	Trace a title, then increase all indentation until scope is left.
+		{
+			QUARK_SCOPED_TRACE("File contents");
+			QUARK_TRACE("insides");
+		}
+
+	Increase indentation until scope is left.
+		{
+			QUARK_SCOPED_INDENT;
+			QUARK_TRACE("insides");
+		}
+
+
+ASSERT
+------------------------------------------------------------------------------------------------------------------------
+Assert is used for finding runtime defects. Use QUARK__ASSERT_ON to enable / disable all asserts.
+
+
+Examples:
+	Check function arguments
+		char* my_strlen(const char* s){
+			QUARK_ASSERT(s != nullptr);
+			...
+		}
+
+	Detect
+
+	Detect impossible conditions:
+		if(a == 0){
+		}
+		else if (a == 3){
+		}
+		else {
+			QUARK_ASSERT_UNREACHABLE;
+		}
+
+
+UNIT TEST
+------------------------------------------------------------------------------------------------------------------------
+You can easily add a unit test where ever you can define a function. It's possible to interleave the functions with
+the unit tests that excercise the functions. You supply 4 strings to each test:
+
+QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result)
+
+You check for failure / success using QUARK_TEST_VERIFY(expression). Do not use QUARK_ASSERT to check for test failures.
+
+It is possible to run unit tests even when asserts are disabled.
+
+
+Examples:
+
+	Registering a unit test
+
+		QUARK_UNIT_TEST("std::list, "list()", "basic construction", "no exceptions"){
+			std::list<int> a;
+		}
+
+		QUARK_UNIT_TEST("std::list, "find()", "empty list", "returns list.end()"){
+			std::list<int> a;
+			std::list<int>::const_iterator found_it = a.find(123);
+			QUARK_TEST_VERIFY(found_it == a.end());
+		}
+
+	Running all unit tests:
+		quark::run_tests();
+*/
+
 
 #include <cassert>
 #include <vector>
@@ -22,20 +109,21 @@
 
 namespace quark {
 
-#if false
+/*
 
-//	FUTURE
+//	TODO
 //	====================================================================================================================
+
+	internals-namespace
 
 	Add basic exception classes, ala bacteria.
 
 	Text lookup:
-		/**
-			Use 7-bit english text as lookup key.
-			Returns localized utf8 text.
-			Basic implementations can chose to just return the lookup key.
-			addKey is additional characters to use for lookup, but that is not part of the actual returned-text if no localization exists.
-		*/
+		/	Use 7-bit english text as lookup key.
+		//	Returns localized utf8 text.
+		//	Basic implementations can chose to just return the lookup key.
+		//	addKey is additional characters to use for lookup, but that is not part of the actual returned-text if
+		//	no localization exists.
 		public: virtual std::string runtime_i__lookup_text(const source_code_location& location,
 			const int locale,
 			const char englishLookupKey[],
@@ -47,14 +135,12 @@ namespace quark {
 		public: virtual void runtime_i__on_dbc_invariant_failed(const char s[]) = 0;
 
 	Test files for unit tests
-		/**
-			gives you native, absolute path to your modules test-directory.
-		*/
+		//	gives you native, absolute path to your modules test-directory.
 		#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(get_runtime(), moduleUnderTest, __FILE__)
 		std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char module_under_test[], const char source_file_path[]);
 
 		public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]) = 0;
-#endif
+*/
 
 
 
@@ -68,7 +154,7 @@ namespace quark {
 ////////////////////////////		source_code_location
 
 
-/**
+/*
 	Value-object that specifies a specific line of code in a specific source file.
 */
 
@@ -90,11 +176,9 @@ struct source_code_location {
 
 ////////////////////////////		runtime_i
 
-
-/**
-	Interface class so client executable can hook-in behaviors for basics like logging and asserts.
+/*
+	Interface class so client can hook-in behaviors for basics like logging and asserts.
 */
-
 
 class runtime_i {
 	public: virtual ~runtime_i(){};
@@ -107,7 +191,7 @@ class runtime_i {
 
 ////////////////////////////		get_runtime() and set_runtime()
 
-/**
+/*
 	Global functions for storing the current runtime.
 	Notice that only the macros use these! The implementation does NOT.
 */
@@ -117,24 +201,19 @@ void set_runtime(runtime_i* iRuntime);
 
 
 
-
-
 //	WORKAROUNDS
 //	====================================================================================================================
-
 
 
 /*
 	Macros to generate unique names for unit test functions etc.
 */
 
-#define PP_STRING(a) #a
-#define PP_CONCAT2(a,b)  a##b
-#define PP_CONCAT3(a, b, c) a##b##c
-#define PP_UNIQUE_LABEL_INTERNAL(prefix, suffix) PP_CONCAT2(prefix, suffix)
-#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__)
-
-
+#define QUARK_STRING(a) #a
+#define QUARK_CONCAT2(a,b)  a##b
+#define QUARK_CONCAT3(a, b, c) a##b##c
+#define QUARK_UNIQUE_LABEL_INTERNAL(prefix, suffix) QUARK_CONCAT2(prefix, suffix)
+#define QUARK_UNIQUE_LABEL(prefix) QUARK_UNIQUE_LABEL_INTERNAL(prefix, __LINE__)
 
 
 
@@ -145,15 +224,16 @@ void set_runtime(runtime_i* iRuntime);
 
 #if QUARK__ASSERT_ON
 
-void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]) __dead2;
+	void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]) __dead2;
 
-#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), PP_STRING(x)); }
+	#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), QUARK_STRING(x)); }
 
-#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)
+	#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)
+
 #else
 
-#define QUARK_ASSERT(x)
-#define QUARK_ASSERT_UNREACHABLE throw std::logic_error("")
+	#define QUARK_ASSERT(x)
+	#define QUARK_ASSERT_UNREACHABLE throw std::logic_error("")
 
 #endif
 
@@ -166,8 +246,7 @@ void on_assert_hook(runtime_i* runtime, const source_code_location& location, co
 
 
 ////////////////////////////		scoped_trace
-
-/**
+/*
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
@@ -210,9 +289,7 @@ struct scoped_trace {
 
 
 ////////////////////////////		scoped_trace_indent
-
-
-/**
+/*
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
@@ -232,42 +309,37 @@ struct scoped_trace_indent {
 
 #if QUARK__TRACE_ON
 
-
-////////////////////////////		Hook functions.
-
-/**
-	These functions are called by the macros and they in turn call the runtime_i.
-*/
-
-
-void on_trace_hook(runtime_i* runtime, const char s[]);
-void on_trace_hook(runtime_i* runtime, const std::string& s);
-void on_trace_hook(runtime_i* runtime, const std::stringstream& s);
+	////////////////////////////		Hook functions.
+	/*
+		These functions are called by the macros and they in turn call the runtime_i.
+	*/
+	void on_trace_hook(runtime_i* runtime, const char s[]);
+	void on_trace_hook(runtime_i* runtime, const std::string& s);
+	void on_trace_hook(runtime_i* runtime, const std::stringstream& s);
 
 
-//	### Use runtime as explicit argument instead?
-#define QUARK_TRACE(s) ::quark::on_trace_hook(::quark::get_runtime(), s)
-#define QUARK_TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::on_trace_hook(::quark::get_runtime(), ss);}
+	//	### Use runtime as explicit argument instead?
+	#define QUARK_TRACE(s) ::quark::on_trace_hook(::quark::get_runtime(), s)
+	#define QUARK_TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::on_trace_hook(::quark::get_runtime(), ss);}
 
-/**
-	Works with:
-		char[]
-		std::string
-*/
-#define QUARK_SCOPED_TRACE(s) ::quark::scoped_trace PP_UNIQUE_LABEL(scoped_trace) (s)
-#define QUARK_SCOPED_INDENT() ::quark::scoped_trace_indent PP_UNIQUE_LABEL(scoped_indent)
+	/*
+		Works with:
+			char[]
+			std::string
+	*/
+	#define QUARK_SCOPED_TRACE(s) ::quark::scoped_trace QUARK_UNIQUE_LABEL(scoped_trace) (s)
+	#define QUARK_SCOPED_INDENT() ::quark::scoped_trace_indent QUARK_UNIQUE_LABEL(scoped_indent)
 
-#define QUARK_TRACE_FUNCTION() ::quark::scoped_trace PP_UNIQUE_LABEL(trace_function) (__FUNCTION__)
-
+	#define QUARK_TRACE_FUNCTION() ::quark::scoped_trace QUARK_UNIQUE_LABEL(trace_function) (__FUNCTION__)
 
 #else
 
-#define QUARK_TRACE(s)
-#define QUARK_TRACE_SS(s)
+	#define QUARK_TRACE(s)
+	#define QUARK_TRACE_SS(s)
 
-#define QUARK_SCOPED_TRACE(s)
-#define QUARK_SCOPED_INDENT()
-#define QUARK_TRACE_FUNCTION()
+	#define QUARK_SCOPED_TRACE(s)
+	#define QUARK_SCOPED_INDENT()
+	#define QUARK_TRACE_FUNCTION()
 
 #endif
 
@@ -281,129 +353,104 @@ void on_trace_hook(runtime_i* runtime, const std::stringstream& s);
 #if QUARK__UNIT_TESTS_ON
 
 
-typedef void (*unit_test_function)();
+	typedef void (*unit_test_function)();
 
 
-////////////////////////////		unit_test_def
-
-
-/**
-	The defintion of a single unit test, including the function itself.
-*/
-
-struct unit_test_def {
-	unit_test_def(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
-	:
-		_class_under_test(p1),
-		_function_under_test(p2),
-		_scenario(p3),
-		_expected_result(p4),
-		_test_f(f)
-	{
-	}
-
-	////////////////		State.
-		std::string _class_under_test;
-
-		std::string _function_under_test;
-		std::string _scenario;
-		std::string _expected_result;
-
-		unit_test_function _test_f;
-};
-
-////////////////////////////		unit_test_registry
-
-
-/**
-	Stores all unit tests registered for the entire executable.
-*/
-
-struct unit_test_registry {
-	public: std::vector<const unit_test_def> _tests;
-};
-
-
-
-////////////////////////////		unit_test_rec
-
-
-/**
-	This is part of an RAII-mechansim to register and unregister unit-tests.
-*/
-
-struct unit_test_rec {
-	unit_test_rec(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
-		unit_test_def test(p1, p2, p3, p4, f);
-		if(!_registry_instance){
-			_registry_instance = new unit_test_registry();
+	////////////////////////////		unit_test_def
+	/*
+		The defintion of a single unit test, including the function itself.
+	*/
+	struct unit_test_def {
+		unit_test_def(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
+		:
+			_class_under_test(p1),
+			_function_under_test(p2),
+			_scenario(p3),
+			_expected_result(p4),
+			_test_f(f)
+		{
 		}
-		_registry_instance->_tests.push_back(test);
-	}
+
+		////////////////		State.
+			std::string _class_under_test;
+
+			std::string _function_under_test;
+			std::string _scenario;
+			std::string _expected_result;
+
+			unit_test_function _test_f;
+	};
 
 
-	////////////////		State.
-
-	//	!!! Singleton. ### lose this.
-	static unit_test_registry* _registry_instance;
-};
-
-
-
-////////////////////////////		Hooks
+	////////////////////////////		unit_test_registry
+	/*
+		Stores all unit tests registered for the entire executable.
+	*/
+	struct unit_test_registry {
+		public: std::vector<const unit_test_def> _tests;
+	};
 
 
-
-void on_unit_test_failed_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
-
-
-
-////////////////////////////		run_tests()
-
-
-/**
-	Client application calls this function run all unit tests.
-	It will handle tracing and exceptions etc.
-	On unit-test failure this function exits the executable.
-*/
-void run_tests();
+	////////////////////////////		unit_test_rec
+	/*
+		This is part of an RAII-mechansim to register and unregister unit-tests.
+	*/
+	struct unit_test_rec {
+		unit_test_rec(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
+			unit_test_def test(p1, p2, p3, p4, f);
+			if(!_registry_instance){
+				_registry_instance = new unit_test_registry();
+			}
+			_registry_instance->_tests.push_back(test);
+		}
 
 
+		////////////////		State.
 
-////////////////////////////		Macros used by client code
+		//	!!! Singleton. ### lose this.
+		static unit_test_registry* _registry_instance;
+	};
 
 
+	////////////////////////////		Hooks
 
-//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
-#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
-	static void PP_UNIQUE_LABEL(cppext_unit_test_)(); \
-	static ::quark::unit_test_rec PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
-	static void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
-//### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
-#define QUARK_UT_VERIFY(exp) if(exp){}else{ ::quark::on_unit_test_failed_hook(::quark::get_runtime(), ::quark::source_code_location(__FILE__, __LINE__), PP_STRING(exp)); }
+	void on_unit_test_failed_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
 
-#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
+	////////////////////////////		run_tests()
+	/*
+		Client application calls this function run all unit tests.
+		It will handle tracing and exceptions etc.
+		On unit-test failure this function exits the executable.
+	*/
+	void run_tests();
+
+
+	////////////////////////////		Macros used by client code
+
+
+	//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
+	#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
+		static void QUARK_UNIQUE_LABEL(cppext_unit_test_)(); \
+		static ::quark::unit_test_rec QUARK_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, QUARK_UNIQUE_LABEL(cppext_unit_test_)); \
+		static void QUARK_UNIQUE_LABEL(cppext_unit_test_)()
+
+	//### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
+	#define QUARK_UT_VERIFY(exp) if(exp){}else{ ::quark::on_unit_test_failed_hook(::quark::get_runtime(), ::quark::source_code_location(__FILE__, __LINE__), QUARK_STRING(exp)); }
+
+	#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
 #else
 
+	//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
+	#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
+		void QUARK_UNIQUE_LABEL(cppext_unit_test_)()
 
-
-//	The generated function is static and will be stripped in optimized builds (it will not be referenced).
-#define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
-	void PP_UNIQUE_LABEL(cppext_unit_test_)()
-
-#define QUARK_UT_VERIFY(exp)
-#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
-
+	#define QUARK_UT_VERIFY(exp)
+	#define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
 #endif
-
-
-
-
-
 
 
 
@@ -413,16 +460,14 @@ void run_tests();
 
 
 
-//////////////////////////////////			TDefaultRuntime
-
-/**
+//////////////////////////////////			default_runtime
+/*
 	This is a default implementation that client can chose to instantiate and plug-in using set_runtime().
 
 	It uses cout.
 */
-
-struct TDefaultRuntime : public runtime_i {
-	TDefaultRuntime(const std::string& test_data_root);
+struct default_runtime : public runtime_i {
+	default_runtime(const std::string& test_data_root);
 
 	public: virtual void runtime_i__trace(const char s[]);
 	public: virtual void runtime_i__add_log_indent(long add);

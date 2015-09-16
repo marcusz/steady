@@ -14,18 +14,20 @@
 
 
 void Example(){
-	steady::steady_vector<int> a;
-	a = a.push_back(3);
-	a = a.push_back(8);
-	a = a.push_back(11);
+	{
+		steady::steady_vector<int> a;
+		a = a.push_back(3);
+		a = a.push_back(8);
+		a = a.push_back(11);
 
-	QUARK_ASSERT(a.size() == 3);
+		QUARK_ASSERT(a.size() == 3);
+	}
+
+	{
+	}
 }
 
 int main(int argc, const char * argv[]){
-	quark::TDefaultRuntime runtime("");
-	quark::set_runtime(&runtime);
-
 #if QUARK__UNIT_TESTS_ON
 	quark::run_tests();
 #endif

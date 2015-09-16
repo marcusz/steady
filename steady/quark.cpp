@@ -1,6 +1,5 @@
 //
-//  cpp_extension.cpp
-//  steady
+//  quark.cpp
 //
 //  Created by Marcus Zetterquist on 2013-11-22.
 //  Copyright (c) 2013 Marcus Zetterquist. All rights reserved.
@@ -18,24 +17,23 @@
 namespace quark {
 
 #if QUARK__UNIT_TESTS_ON
-unit_test_registry* unit_test_rec::_registry_instance = nullptr;
+	unit_test_registry* unit_test_rec::_registry_instance = nullptr;
 #endif
 
 
 namespace {
-	runtime_i* gRuntimePtr = nullptr;
+	quark::default_runtime default_runtime("");
+	runtime_i* runtime = &default_runtime;
 }
 
 
 runtime_i* get_runtime(){
-	return gRuntimePtr;
+	return runtime;
 }
 
 void set_runtime(runtime_i* iRuntime){
-	gRuntimePtr = iRuntime;
+	runtime = iRuntime;
 }
-
-
 
 
 
@@ -172,21 +170,19 @@ void run_tests(){
 
 
 
-//////////////////////////////////			TDefaultRuntime
+//////////////////////////////////			default_runtime
 
 
 
 
 
-TDefaultRuntime::TDefaultRuntime(const std::string& test_data_root) :
+default_runtime::default_runtime(const std::string& test_data_root) :
 	_test_data_root(test_data_root),
 	_indent(0)
 {
 }
 
-void TDefaultRuntime::runtime_i__trace(const char s[]){
-//		for (auto &i: items){
-//		}
+void default_runtime::runtime_i__trace(const char s[]){
 	for(long i = 0 ; i < _indent ; i++){
 		std::cout << "|\t";
 	}
@@ -195,17 +191,17 @@ void TDefaultRuntime::runtime_i__trace(const char s[]){
 	std::cout << std::endl;
 }
 
-void TDefaultRuntime::runtime_i__add_log_indent(long add){
+void default_runtime::runtime_i__add_log_indent(long add){
 	_indent += add;
 }
 
-void TDefaultRuntime::runtime_i__on_assert(const source_code_location& location, const char expression[]){
+void default_runtime::runtime_i__on_assert(const source_code_location& location, const char expression[]){
 	QUARK_TRACE_SS(std::string("Assertion failed ") << location._source_file << ", " << location._line_number << " \"" << expression << "\"");
 	perror("perror() says");
 	throw std::logic_error("assert");
 }
 
-void TDefaultRuntime::runtime_i__on_unit_test_failed(const source_code_location& location, const char expression[]){
+void default_runtime::runtime_i__on_unit_test_failed(const source_code_location& location, const char expression[]){
 	QUARK_TRACE_SS("Unit test failed " << location._source_file << ", " << location._line_number << " \"" << expression << "\"");
 	perror("perror() says");
 
@@ -223,7 +219,7 @@ void TDefaultRuntime::runtime_i__on_unit_test_failed(const source_code_location&
 /*
 	This function uses all macros so we know they compile.
 */
-void TestMacros(){
+void test_macros(){
 	QUARK_ASSERT(true);
 	QUARK_ASSERT_UNREACHABLE;
 
@@ -238,7 +234,6 @@ QUARK_UNIT_TEST("", "", "", ""){
 	QUARK_UT_VERIFY(true);
 	QUARK_TEST_VERIFY(true);
 }
-
 
 
 }
