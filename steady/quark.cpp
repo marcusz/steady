@@ -18,7 +18,7 @@
 namespace quark {
 
 #if QUARK__UNIT_TESTS_ON
-TUniTestRegistry* TUnitTestReg::gRegistry = nullptr;
+unit_test_registry* unit_test_rec::_registry_instance = nullptr;
 #endif
 
 
@@ -102,11 +102,11 @@ void on_trace_hook(runtime_i* runtime, const std::stringstream& s){
 
 #if QUARK__UNIT_TESTS_ON
 
-void OnUnitTestFailedHook(runtime_i* iRuntime, const source_code_location& location, const char expression[]){
-	assert(iRuntime != nullptr);
+void on_unit_test_failed_hook(runtime_i* runtime, const source_code_location& location, const char expression[]){
+	assert(runtime != nullptr);
 	assert(expression != nullptr);
 
-	iRuntime->runtime_i__on_unit_test_failed(location, expression);
+	runtime->runtime_i__on_unit_test_failed(location, expression);
 }
 
 /*
@@ -123,15 +123,15 @@ std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char iModuleUnde
 
 void run_tests(){
 	QUARK_TRACE_FUNCTION();
-	QUARK_ASSERT(TUnitTestReg::gRegistry != nullptr);
+	QUARK_ASSERT(unit_test_rec::_registry_instance != nullptr);
 
-	std::size_t test_count = TUnitTestReg::gRegistry->fTests.size();
+	std::size_t test_count = unit_test_rec::_registry_instance->_tests.size();
 //	std::size_t fail_count = 0;
 
 	QUARK_TRACE_SS("Running " << test_count << " tests...");
 
 	for(std::size_t i = 0 ; i < test_count ; i++){
-		const TUnitTestDefinition& test = TUnitTestReg::gRegistry->fTests[i];
+		const unit_test_def& test = unit_test_rec::_registry_instance->_tests[i];
 
 		std::stringstream testInfo;
 		testInfo << "Test #" << i
@@ -178,16 +178,16 @@ void run_tests(){
 
 
 
-TDefaultRuntime::TDefaultRuntime(const std::string& iTestDataRoot) :
-	fTestDataRoot(iTestDataRoot),
-	fIndent(0)
+TDefaultRuntime::TDefaultRuntime(const std::string& test_data_root) :
+	_test_data_root(test_data_root),
+	_indent(0)
 {
 }
 
 void TDefaultRuntime::runtime_i__trace(const char s[]){
 //		for (auto &i: items){
 //		}
-	for(long i = 0 ; i < fIndent ; i++){
+	for(long i = 0 ; i < _indent ; i++){
 		std::cout << "|\t";
 	}
 
@@ -195,8 +195,8 @@ void TDefaultRuntime::runtime_i__trace(const char s[]){
 	std::cout << std::endl;
 }
 
-void TDefaultRuntime::runtime_i__add_log_indent(long iAdd){
-	fIndent += iAdd;
+void TDefaultRuntime::runtime_i__add_log_indent(long add){
+	_indent += add;
 }
 
 void TDefaultRuntime::runtime_i__on_assert(const source_code_location& location, const char expression[]){
@@ -211,6 +211,13 @@ void TDefaultRuntime::runtime_i__on_unit_test_failed(const source_code_location&
 
 	throw std::logic_error("Unit test failed");
 }
+
+
+
+
+//	TESTS
+//	====================================================================================================================
+
 
 
 /*

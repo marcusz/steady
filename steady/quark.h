@@ -27,31 +27,39 @@ namespace quark {
 //	FUTURE
 //	====================================================================================================================
 
+	Add basic exception classes, ala bacteria.
 
-	/**
-		Use 7-bit english text as lookup key.
-		Returns localized utf8 text.
-		Basic implementations can chose to just return the lookup key.
-		addKey is additional characters to use for lookup, but that is not part of the actual returned-text if no localization exists.
-	*/
-	public: virtual std::string runtime_i__lookup_text(const source_code_location& location,
-		const int locale,
-		const char englishLookupKey[],
-		const char addKey[]) = 0;
+	Text lookup:
+		/**
+			Use 7-bit english text as lookup key.
+			Returns localized utf8 text.
+			Basic implementations can chose to just return the lookup key.
+			addKey is additional characters to use for lookup, but that is not part of the actual returned-text if no localization exists.
+		*/
+		public: virtual std::string runtime_i__lookup_text(const source_code_location& location,
+			const int locale,
+			const char englishLookupKey[],
+			const char addKey[]) = 0;
 
+	Design by contract:
+		public: virtual void runtime_i__on_dbc_precondition_failed(const char s[]) = 0;
+		public: virtual void runtime_i__on_dbc_postcondition_failed(const char s[]) = 0;
+		public: virtual void runtime_i__on_dbc_invariant_failed(const char s[]) = 0;
 
-	public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]) = 0;
-	public: virtual void runtime_i__on_dbc_precondition_failed(const char s[]) = 0;
-	public: virtual void runtime_i__on_dbc_postcondition_failed(const char s[]) = 0;
-	public: virtual void runtime_i__on_dbc_invariant_failed(const char s[]) = 0;
+	Test files for unit tests
+		/**
+			gives you native, absolute path to your modules test-directory.
+		*/
+		#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(get_runtime(), moduleUnderTest, __FILE__)
+		std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char module_under_test[], const char source_file_path[]);
+
+		public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]) = 0;
 #endif
 
 
 
 //	PRIMITIVES
 //	====================================================================================================================
-
-
 
 
 
@@ -111,37 +119,20 @@ void set_runtime(runtime_i* iRuntime);
 
 
 
-
 //	WORKAROUNDS
 //	====================================================================================================================
 
 
 
-
-
-////////////////////////////		Macros
-
+/*
+	Macros to generate unique names for unit test functions etc.
+*/
 
 #define PP_STRING(a) #a
 #define PP_CONCAT2(a,b)  a##b
 #define PP_CONCAT3(a, b, c) a##b##c
 #define PP_UNIQUE_LABEL_INTERNAL(prefix, suffix) PP_CONCAT2(prefix, suffix)
 #define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), __FILE__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(prefix, __COUNTER__)
-//#define PP_UNIQUE_LABEL(prefix) PP_UNIQUE_LABEL_INTERNAL(PP_UNIQUE_LABEL_INTERNAL(prefix, __LINE__), PP_UNIQUE_LABEL_INTERNAL(abcd, HashString(__FILE__)))
-
-/*
-// boiler-plate
-#define CONCATENATE_DETAIL(x, y) x##y
-#define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
-#define MAKE_UNIQUE(x) CONCATENATE(x, __COUNTER__)
-
-// per-transform type
-#define GL_TRANSLATE_DETAIL(n, x, y, z) GlTranslate n(x, y, z)
-#define GL_TRANSLATE(x, y, z) GL_TRANSLATE_DETAIL(MAKE_UNIQUE(_trans_), x, y, z)
-*/
-
 
 
 
@@ -149,6 +140,8 @@ void set_runtime(runtime_i* iRuntime);
 
 //	ASSERT SUPPORT
 //	====================================================================================================================
+
+
 
 #if QUARK__ASSERT_ON
 
@@ -163,8 +156,6 @@ void on_assert_hook(runtime_i* runtime, const source_code_location& location, co
 #define QUARK_ASSERT_UNREACHABLE throw std::logic_error("")
 
 #endif
-
-
 
 
 
@@ -189,6 +180,7 @@ struct scoped_trace {
 		r->runtime_i__add_log_indent(1);
 #endif
 	}
+
 	scoped_trace(const std::string& s){
 #if QUARK__TRACE_ON
 		runtime_i* r = get_runtime();
@@ -197,6 +189,7 @@ struct scoped_trace {
 		r->runtime_i__add_log_indent(1);
 #endif
 	}
+
 	scoped_trace(const std::stringstream& s){
 #if QUARK__TRACE_ON
 		runtime_i* r = get_runtime();
@@ -205,6 +198,7 @@ struct scoped_trace {
 		r->runtime_i__add_log_indent(1);
 #endif
 	}
+
 	~scoped_trace(){
 #if QUARK__TRACE_ON
 		runtime_i* r = get_runtime();
@@ -234,6 +228,7 @@ struct scoped_trace_indent {
 	}
 #endif
 };
+
 
 #if QUARK__TRACE_ON
 
@@ -289,15 +284,15 @@ void on_trace_hook(runtime_i* runtime, const std::stringstream& s);
 typedef void (*unit_test_function)();
 
 
-////////////////////////////		TUnitTestDefinition
+////////////////////////////		unit_test_def
 
 
 /**
 	The defintion of a single unit test, including the function itself.
 */
 
-struct TUnitTestDefinition {
-	TUnitTestDefinition(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
+struct unit_test_def {
+	unit_test_def(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f)
 	:
 		_class_under_test(p1),
 		_function_under_test(p2),
@@ -306,7 +301,6 @@ struct TUnitTestDefinition {
 		_test_f(f)
 	{
 	}
-
 
 	////////////////		State.
 		std::string _class_under_test;
@@ -318,36 +312,40 @@ struct TUnitTestDefinition {
 		unit_test_function _test_f;
 };
 
-////////////////////////////		TUnitTestDefinition
+////////////////////////////		unit_test_registry
 
 
 /**
 	Stores all unit tests registered for the entire executable.
 */
 
-struct TUniTestRegistry {
-	public: std::vector<const TUnitTestDefinition> fTests;
+struct unit_test_registry {
+	public: std::vector<const unit_test_def> _tests;
 };
 
 
 
-////////////////////////////		TUnitTestDefinition
+////////////////////////////		unit_test_rec
 
 
 /**
 	This is part of an RAII-mechansim to register and unregister unit-tests.
 */
 
-struct TUnitTestReg {
-	static TUniTestRegistry* gRegistry;
-
-	TUnitTestReg(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
-		TUnitTestDefinition test(p1, p2, p3, p4, f);
-		if(!gRegistry){
-			gRegistry = new TUniTestRegistry();
+struct unit_test_rec {
+	unit_test_rec(const std::string& p1, const std::string& p2, const std::string& p3, const std::string& p4, unit_test_function f){
+		unit_test_def test(p1, p2, p3, p4, f);
+		if(!_registry_instance){
+			_registry_instance = new unit_test_registry();
 		}
-		gRegistry->fTests.push_back(test);
+		_registry_instance->_tests.push_back(test);
 	}
+
+
+	////////////////		State.
+
+	//	!!! Singleton. ### lose this.
+	static unit_test_registry* _registry_instance;
 };
 
 
@@ -356,8 +354,7 @@ struct TUnitTestReg {
 
 
 
-void OnUnitTestFailedHook(runtime_i* iRuntime, const source_code_location& location, const char iExpression[]);
-std::string OnGetPrivateTestDataPath(runtime_i* iRuntime, const char iModuleUnderTest[], const char source_file_path[]);
+void on_unit_test_failed_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
 
 
 
@@ -380,20 +377,14 @@ void run_tests();
 //	The generated function is static and will be stripped in optimized builds (it will not be referenced).
 #define QUARK_UNIT_TEST(class_under_test, function_under_test, scenario, expected_result) \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)(); \
-	static ::quark::TUnitTestReg PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
+	static ::quark::unit_test_rec PP_UNIQUE_LABEL(rec)(class_under_test, function_under_test, scenario, expected_result, PP_UNIQUE_LABEL(cppext_unit_test_)); \
 	static void PP_UNIQUE_LABEL(cppext_unit_test_)()
 
 //### Add argument to unit-test functions that can be used / checked in UT_VERIFY().
-#define QUARK_UT_VERIFY(exp) if(exp){}else{ ::quark::OnUnitTestFailedHook(::quark::get_runtime(), ::quark::source_code_location(__FILE__, __LINE__), PP_STRING(exp)); }
+#define QUARK_UT_VERIFY(exp) if(exp){}else{ ::quark::on_unit_test_failed_hook(::quark::get_runtime(), ::quark::source_code_location(__FILE__, __LINE__), PP_STRING(exp)); }
 
 #define QUARK_TEST_VERIFY QUARK_UT_VERIFY
 
-
-
-/**
-	gives you native, absolute path to your modules test-directory.
-*/
-//#define UNIT_TEST_PRIVATE_DATA_PATH(moduleUnderTest) OnGetPrivateTestDataPath(get_runtime(), moduleUnderTest, __FILE__)
 
 #else
 
@@ -431,18 +422,17 @@ void run_tests();
 */
 
 struct TDefaultRuntime : public runtime_i {
-	TDefaultRuntime(const std::string& iTestDataRoot);
+	TDefaultRuntime(const std::string& test_data_root);
 
 	public: virtual void runtime_i__trace(const char s[]);
-	public: virtual void runtime_i__add_log_indent(long iAdd);
-	public: virtual void runtime_i__on_assert(const source_code_location& location, const char iExpression[]);
-	public: virtual void runtime_i__on_unit_test_failed(const source_code_location& location, const char iExpression[]);
-//	public: virtual std::string icppextension_get_test_data_root(const char iModuleUnderTest[]);
+	public: virtual void runtime_i__add_log_indent(long add);
+	public: virtual void runtime_i__on_assert(const source_code_location& location, const char expression[]);
+	public: virtual void runtime_i__on_unit_test_failed(const source_code_location& location, const char expression[]);
 
 
 	///////////////		State.
-		const std::string fTestDataRoot;
-		long fIndent;
+		const std::string _test_data_root;
+		long _indent;
 };
 
 
