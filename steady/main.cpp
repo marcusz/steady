@@ -37,6 +37,17 @@ void Example(){
 		const auto e = d + d + d + d + d + d + d + d + d + d;
 		QUARK_ASSERT(e.size() == 100000);
 	}
+
+
+#if false
+	{
+		steady::vector<int> a;
+		for(int i = 0 ; i < 10000000 ; i++){
+			 a = a.push_back(i);
+		}
+		QUARK_ASSERT(a.size() == 1000000);
+	}
+#endif
 }
 
 int main(int argc, const char * argv[]){

@@ -25,7 +25,7 @@ SOMEDAY
 ====================================================================================================================
 [feature] first(),rest(). Add seq?
 
-[optimization] optimize operator==()
+[optimization] optimize operator==() further, using recursion.
 
 [optimization] Make inode use one pointer - not two - for each child.
 
@@ -38,8 +38,6 @@ SOMEDAY
 [optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
 
 [optimization] Over-alloc / reserve nodes like std::vector<>?
-
-[optimization] Path copying requires 31 * 6 RC-bumps!
 
 [optimization] Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
 
@@ -79,16 +77,6 @@ namespace internals {
 
 template <class T>
 struct leaf_node {
-/*
-	public: leaf_node(const T values[]) :
-		_rc(0)
-	{
-		std::copy(&values[0], &values[BRANCHING_FACTOR], _values.begin());
-		_debug_count++;
-		ASSERT(check_invariant());
-	}
-*/
-
 	public: leaf_node() :
 		_rc(0)
 	{
