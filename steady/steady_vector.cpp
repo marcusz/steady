@@ -581,8 +581,6 @@ namespace {
 	}
 
 
-
-	//	### supply shift.
 	template <class T>
 	node_ref<T> find_leaf_node(const node_ref<T>& root_node, size_t size, int shift, size_t index){
 		ASSERT(tree_check_invariant(root_node, size));
@@ -780,16 +778,6 @@ namespace {
 	/*
 		This is the central building block: adds many values to a vector (or a create a new vector) fast.
 	*/
-	template <class T>
-	vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
-		ASSERT(original.check_invariant());
-
-		vector<T> result = original;
-		for(size_t i = 0 ; i < count ; i++){
-			result = result.push_back(values[i]);
-		}
-		return result;
-	}
 #if false
 	template <class T>
 	vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
@@ -797,74 +785,65 @@ namespace {
 		ASSERT(values != nullptr);
 
 		vector<T> result = original;
+		for(size_t i = 0 ; i < count ; i++){
+			result = result.push_back(values[i]);
+		}
+		return result;
+	}
 
+#else
+
+	template <class T>
+	vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
+		ASSERT(original.check_invariant());
+		ASSERT(values != nullptr);
+
+		vector<T> result = original;
 		size_t source_pos = 0;
 
 		/*
-			1) If the last leaf node is partially filled, pad it out.
+			1) If the last leaf node in destination is partially filled, pad it out.
 		*/
 		{
 			size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
-			size_t dest_pos = last_leaf_size;
-			while(dest_pos < BRANCHING_FACTOR && source_pos < count){
-			//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
-		//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
+			size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
+			for(size_t i = 0 ; i < copy_count ; i++){
+				//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
+				//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
 
-				result = result.push_back(values[source_pos]);
-				dest_pos++;
+				result = push_back_1(result, values[source_pos]);
 				source_pos++;
 			}
 		}
 
 		/*
-			Append entire leaf nodes while there are enough source values.
+			Append _entire leaf nodes_ while there are enough source values.
 		*/
 		while((source_pos + BRANCHING_FACTOR) <= count){
+			ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
+
+			for(size_t i = 0 ; i < BRANCHING_FACTOR ; i++){
+				result = push_back_1(result, values[source_pos]);
+				source_pos++;
+			}
 		}
 
 		/*
 			3) If there are values left for a partial leaf node, make that leaf node now.
 		*/
-		{
-		}
-
-
-		if(_size == 0){
-			return vector<T>(make_leaf_node<T>({value}), 1);
-		}
-		else{
-
-			//	Does last leaf node have space left? Then we can use replace_value()...
-			if((_size & BRANCHING_FACTOR_MASK) != 0){
-				auto shift = vector_size_to_shift(_size);
-				const auto root = replace_value(_root, shift, _size, value);
-				return vector<T>(root, _size + 1);
-			}
-
-			//	Allocate new *leaf-node*, adding it to tree.
-			else{
-				const auto leaf = make_leaf_node<T>({ value });
-
-				auto shift = vector_size_to_shift(_size);
-				auto shift2 = vector_size_to_shift(_size + 1);
-
-				//	Space left in root?
-				if(shift2 == shift){
-					const auto root = append_leaf_node(_root, shift, _size, leaf);
-					return vector<T>(root, _size + 1);
-				}
-				else{
-					auto new_path = make_new_path(shift, leaf);
-					auto new_root = make_inode_from_array<T>({ _root, new_path });
-					return vector<T>(new_root, _size + 1);
-				}
+		if(source_pos < count){
+			size_t copy = count - source_pos;
+			for(size_t i = 0 ; i < copy ; i++){
+				result = push_back_1(result, values[source_pos]);
+				source_pos++;
 			}
 		}
+
+		ASSERT(result.check_invariant());
+		ASSERT(result.size() == original.size() + count);
+		return result;
 	}
-
 #endif
-
-
 
 }
 
