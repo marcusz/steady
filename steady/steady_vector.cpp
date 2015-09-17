@@ -584,15 +584,13 @@ namespace {
 
 
 
-
+	//	### supply shift.
 	template <class T>
-	node_ref<T> find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
-		ASSERT(tree_check_invariant(tree, size));
+	node_ref<T> find_leaf_node(const node_ref<T>& root_node, size_t size, int shift, size_t index){
+		ASSERT(tree_check_invariant(root_node, size));
 		ASSERT(index < size);
 
-		auto shift = vector_size_to_shift(size);
-
-		node_ref<T> node_it = tree;
+		node_ref<T> node_it = root_node;
 
 		//	Traverse all inodes.
 		while(shift > 0){
@@ -601,7 +599,7 @@ namespace {
 			shift -= BRANCHING_FACTOR_SHIFT;
 		}
 
-		ASSERT(shift == 0);
+		ASSERT(shift == LEAF_NODE_SHIFT);
 		ASSERT(node_it.get_type() == node_type::leaf_node);
 		return node_it;
 	}
@@ -621,7 +619,7 @@ namespace {
 		ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
 
 		const size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
-		if(shift == 0){
+		if(shift == LEAF_NODE_SHIFT){
 			ASSERT(node.get_type() == node_type::leaf_node);
 
 			auto copy = node_ref<T>(new leaf_node<T>(node.get_leaf_node()->_values));
@@ -645,7 +643,7 @@ namespace {
 
 	template <class T>
 	node_ref<T> make_new_path(int shift, const node_ref<T>& append){
-		if(shift == 0){
+		if(shift == LEAF_NODE_SHIFT){
 			return append;
 		}
 		else{
@@ -675,7 +673,7 @@ namespace {
 		auto children = original.get_inode()->get_child_array();
 
 		//	Lowest level inode, pointing to leaf nodes.
-		if(shift == BRANCHING_FACTOR_SHIFT){
+		if(shift == LOWEST_LEVEL_INODE_SHIFT){
 			children[slot_index] = append;
 			return make_inode_from_array<T>(children);
 		}
@@ -700,34 +698,35 @@ namespace {
 		ASSERT(original.check_invariant());
 
 		const auto original_size = original.size();
+		const auto original_shift = original.get_shift();
+
 		if(original_size == 0){
-			return vector<T>(make_leaf_node<T>({value}), 1);
+			return vector<T>(make_leaf_node<T>({value}), 1, LEAF_NODE_SHIFT);
 		}
 		else{
 
 			//	Does last leaf node have space left? Then we can use modify_existing_value()...
 			if((original_size & BRANCHING_FACTOR_MASK) != 0){
-				auto shift = vector_size_to_shift(original_size);
-				const auto root = modify_existing_value(original.get_root(), shift, original_size, value);
-				return vector<T>(root, original_size + 1);
+				const auto root = modify_existing_value(original.get_root(), original_shift, original_size, value);
+				return vector<T>(root, original_size + 1, original_shift);
 			}
 
 			//	Allocate new *leaf-node*, adding it to tree.
 			else{
 				const auto leaf = make_leaf_node<T>({ value });
 
-				auto shift = vector_size_to_shift(original_size);
+				//	### no need to calculate shift2 from scratch, just compare (1 << original_shift) and (size + 1).
 				auto shift2 = vector_size_to_shift(original_size + 1);
 
 				//	Space left in root?
-				if(shift2 == shift){
-					const auto root = append_leaf_node(original.get_root(), shift, original_size, leaf);
-					return vector<T>(root, original_size + 1);
+				if(shift2 == original_shift){
+					const auto root = append_leaf_node(original.get_root(), original_shift, original_size, leaf);
+					return vector<T>(root, original_size + 1, original_shift);
 				}
 				else{
-					auto new_path = make_new_path(shift, leaf);
+					auto new_path = make_new_path(original_shift, leaf);
 					auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
-					return vector<T>(new_root, original_size + 1);
+					return vector<T>(new_root, original_size + 1, shift2);
 				}
 			}
 		}
@@ -742,6 +741,8 @@ namespace {
 		ASSERT(original.check_invariant());
 
 		const auto original_size = original.get_size();
+		const auto original_shift = original.get_shift();
+
 		if(original_size == 0){
 			return vector<T>(make_leaf_node<T>(values), BRANCHING_FACTOR);
 		}
@@ -758,16 +759,16 @@ namespace {
 			else{
 				const auto leaf = make_leaf_node<T>(values);
 
-				auto shift = vector_size_to_shift(original_size);
+				//	### no need to calculate shift2 from scratch, just compare (1 << original_shift) and (size + 1).
 				auto shift2 = vector_size_to_shift(original_size + 1);
 
 				//	Space left in root?
-				if(shift2 == shift){
-					const auto root = append_leaf_node(original.get_root(), shift, original_size, leaf);
+				if(shift2 == original_shift){
+					const auto root = append_leaf_node(original.get_root(), original_shift, original_size, leaf);
 					return vector<T>(root, original_size + BRANCHING_FACTOR);
 				}
 				else{
-					auto new_path = make_new_path(shift, leaf);
+					auto new_path = make_new_path(original_shift, leaf);
 					auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
 					return vector<T>(new_root, original_size + BRANCHING_FACTOR);
 				}
@@ -870,17 +871,13 @@ namespace {
 
 
 template <class T>
-vector<T>::vector() :
-	_size(0)
-{
+vector<T>::vector(){
 	ASSERT(check_invariant());
 }
 
 
 template <class T>
-vector<T>::vector(const std::vector<T>& values) :
-	_size(0)
-{
+vector<T>::vector(const std::vector<T>& values){
 	//	!!! Illegal to take adress of first element of vec if it's empty.
 	if(!values.empty()){
 		vector<T> temp(&values[0], values.size());
@@ -891,27 +888,21 @@ vector<T>::vector(const std::vector<T>& values) :
 }
 
 template <class T>
-vector<T>::vector(const T values[], size_t count) :
-	_size(0)
-{
+vector<T>::vector(const T values[], size_t count){
 	ASSERT(values != nullptr);
 
 	vector<T> temp;
 	for(size_t i = 0 ; i < count ; i++){
 		temp = temp.push_back(values[i]);
 	}
-
-	vector<T> temp2 = temp;
-	temp2.swap(*this);
+	temp.swap(*this);
 
 	ASSERT(check_invariant());
 }
 
 
 template <class T>
-vector<T>::vector(std::initializer_list<T> args) :
-	_size(0)
-{
+vector<T>::vector(std::initializer_list<T> args){
 	std::vector<T> temp(args.begin(), args.end());
 	vector<T> temp2 = temp;
 	temp2.swap(*this);
@@ -937,20 +928,23 @@ bool vector<T>::check_invariant() const{
 		ASSERT(_size >= 0);
 	}
 	ASSERT(tree_check_invariant(_root, _size));
+
+	ASSERT(_shift >= EMPTY_TREE_SHIFT && _shift < 32);
+	ASSERT(_shift == vector_size_to_shift(_size));
+
 	return true;
 }
 
 
 template <class T>
-vector<T>::vector(const vector& rhs)
-:
-	_size(0)
-{
+vector<T>::vector(const vector& rhs){
 	ASSERT(rhs.check_invariant());
 
 	node_ref<T> newRef(rhs._root);
-	_root.swap(newRef);
+
+	_root = newRef;
 	_size = rhs._size;
+	_shift = rhs._shift;
 
 	ASSERT(check_invariant());
 }
@@ -976,6 +970,7 @@ void vector<T>::swap(vector& rhs){
 
 	_root.swap(rhs._root);
 	std::swap(_size, rhs._size);
+	std::swap(_shift, rhs._shift);
 
 	ASSERT(check_invariant());
 	ASSERT(rhs.check_invariant());
@@ -983,11 +978,22 @@ void vector<T>::swap(vector& rhs){
 
 
 template <class T>
-vector<T>::vector(node_ref<T> root, std::size_t size) :
+vector<T>::vector(node_ref<T> root, std::size_t size, int shift) :
 	_root(root),
-	_size(size)
+	_size(size),
+	_shift(shift)
 {
+	ASSERT(shift >= EMPTY_TREE_SHIFT);
+	ASSERT(vector_size_to_shift(size) == shift);
 	ASSERT(check_invariant());
+}
+
+
+template <class T>
+int vector<T>::get_shift() const{
+	ASSERT(check_invariant());
+
+	return _shift;
 }
 
 
@@ -1039,9 +1045,8 @@ vector<T> vector<T>::assoc(size_t index, const T& value) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	auto shift = vector_size_to_shift(_size);
-	const auto root = modify_existing_value(_root, shift, index, value);
-	return vector<T>(root, _size);
+	const auto root = modify_existing_value(_root, _shift, index, value);
+	return vector<T>(root, _size, _shift);
 }
 
 
@@ -1058,7 +1063,7 @@ T vector<T>::operator[](const std::size_t index) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	const auto leaf = find_leaf_node(_root, _size, index);
+	const auto leaf = find_leaf_node(_root, _size, _shift, index);
 	const auto slot_index = index & BRANCHING_FACTOR_MASK;
 
 	ASSERT(slot_index < leaf.get_leaf_node()->_values.size());
@@ -1293,7 +1298,7 @@ vector<int> make_manual_vector1(){
 	test_fixture<int> f(0, 1);
 
 	node_ref<int> leaf = make_leaf_node<int>({ 7 });
-	return vector<int>(leaf, 1);
+	return vector<int>(leaf, 1, LEAF_NODE_SHIFT);
 }
 
 QUARK_UNIT_TEST("", "make_manual_vector1()", "", "correct nodes"){
@@ -1321,7 +1326,7 @@ vector<int> make_manual_vector2(){
 	test_fixture<int> f(0, 1);
 
 	node_ref<int> leaf = make_leaf_node<int>({	7, 8	});
-	return vector<int>(leaf, 2);
+	return vector<int>(leaf, 2, LEAF_NODE_SHIFT);
 }
 
 QUARK_UNIT_TEST("", "make_manual_vector2()", "", "correct nodes"){
@@ -1354,7 +1359,7 @@ vector<int> make_manual_vector_branchfactor_plus_1(){
 	node_ref<int> leaf1 = make_leaf_node(generate_leaves(7 + BRANCHING_FACTOR, 1));
 	std::vector<node_ref<int>> leafs = { leaf0, leaf1 };
 	node_ref<int> inode = make_inode_from_vector(leafs);
-	return vector<int>(inode, BRANCHING_FACTOR + 1);
+	return vector<int>(inode, BRANCHING_FACTOR + 1, vector_size_to_shift(BRANCHING_FACTOR + 1));
 }
 
 QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nodes"){
@@ -1413,7 +1418,8 @@ vector<int> make_manual_vector_branchfactor_square_plus_1(){
 	node_ref<int> inodeA = make_inode_from_vector<int>(leaves);
 	node_ref<int> inodeB = make_inode_from_vector<int>({ extraLeaf });
 	node_ref<int> rootInode = make_inode_from_vector<int>({ inodeA, inodeB });
-	return vector<int>(rootInode, BRANCHING_FACTOR * BRANCHING_FACTOR + 1);
+	const size_t size = BRANCHING_FACTOR * BRANCHING_FACTOR + 1;
+	return vector<int>(rootInode, size, vector_size_to_shift(size));
 }
 
 QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_square_plus_1()", "", "correct nodes"){

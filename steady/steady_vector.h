@@ -16,6 +16,10 @@ namespace steady {
 
 	static const int BRANCHING_FACTOR = 1 << BRANCHING_FACTOR_SHIFT;
 
+	static const int EMPTY_TREE_SHIFT = -BRANCHING_FACTOR_SHIFT;
+	static const int LEAF_NODE_SHIFT = 0;
+	static const int LOWEST_LEVEL_INODE_SHIFT = BRANCHING_FACTOR_SHIFT;
+
 	namespace internals {
 		template <typename T> struct node_ref;
 		template <typename T> struct inode;
@@ -252,14 +256,19 @@ class vector {
 	public: const internals::node_ref<T>& get_root() const{
 		return _root;
 	}
-	public: vector(internals::node_ref<T> root, std::size_t size);
+	public: vector(internals::node_ref<T> root, std::size_t size, int shift);
 
+	public: int get_shift() const;
 
 
 	///////////////////////////////////////		State
 
 	private: internals::node_ref<T> _root;
-	private: std::size_t _size;
+	private: std::size_t _size = 0;
+
+	//	This is the number of shift-steps needed to get to root.
+	//	It can be calculated from _size but that is slow so we cache it.
+	private: int _shift = EMPTY_TREE_SHIFT;
 };
 
 template <class T>
