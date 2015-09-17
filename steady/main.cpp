@@ -28,7 +28,6 @@ void Example(){
 		const auto b = a + a + a + a + a + a + a + a + a + a;
 		QUARK_ASSERT(b.size() == 100);
 
-/*
 		const auto c = b + b + b + b + b + b + b + b + b + b;
 		QUARK_ASSERT(c.size() == 1000);
 
@@ -36,8 +35,7 @@ void Example(){
 		QUARK_ASSERT(d.size() == 10000);
 
 		const auto e = d + d + d + d + d + d + d + d + d + d;
-		QUARK_ASSERT(e.size() == 10000);
-*/
+		QUARK_ASSERT(e.size() == 100000);
 	}
 }
 

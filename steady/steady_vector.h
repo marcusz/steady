@@ -11,7 +11,7 @@ namespace steady {
 
 	//	Change BRANCHING_FACTOR_SHIFT to get different branching factors. Number of bits per inode.
 	//	5 ( = 32 values per node) is ideal.
-	static const int BRANCHING_FACTOR_SHIFT = 3;
+	static const int BRANCHING_FACTOR_SHIFT = 5;
 
 
 	static const int BRANCHING_FACTOR = 1 << BRANCHING_FACTOR_SHIFT;

@@ -606,17 +606,17 @@ namespace {
 		node: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
 
 		shift: shift for current level in tree.
-		leaf_index: index of the leaf node.
+		leaf_index0: index of the first value in the leaf.
 		new_leaf: new leaf node.
 		result: copy of "tree" that has new_leaf replaced. Same size as original.
 			result-tree and original tree shares internal state.
 	*/
 	template <class T>
-	node_ref<T> replace_leaf_node(const node_ref<T>& node, int shift, size_t leaf_index, const node_ref<T>& new_leaf){
+	node_ref<T> replace_leaf_node(const node_ref<T>& node, int shift, size_t leaf_index0, const node_ref<T>& new_leaf){
 		ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
 		ASSERT(new_leaf.check_invariant());
 
-		const size_t slot_index = (leaf_index >> shift) & BRANCHING_FACTOR_MASK;
+		const size_t slot_index = (leaf_index0 >> shift) & BRANCHING_FACTOR_MASK;
 
 		if(shift == LEAF_NODE_SHIFT){
 			ASSERT(node.get_type() == node_type::leaf_node);
@@ -627,7 +627,7 @@ namespace {
 			ASSERT(node.get_type() == node_type::inode);
 
 			const auto child = node.get_inode()->get_child(slot_index);
-			auto child2 = replace_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, index, new_leaf);
+			auto child2 = replace_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, leaf_index0, new_leaf);
 
 			auto children = node.get_inode()->get_child_array();
 			children[slot_index] = child2;
@@ -846,6 +846,8 @@ namespace {
 		{
 			size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
 			if(last_leaf_size > 0){
+				size_t last_leaf_node_index = original.size() & ~(BRANCHING_FACTOR_MASK);
+#if false
 				size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
 				for(size_t i = 0 ; i < copy_count ; i++){
 					//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
@@ -854,6 +856,26 @@ namespace {
 					result = push_back_1(result, values[source_pos]);
 					source_pos++;
 				}
+#else
+				size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
+				node_ref<T> prev_leaf = find_leaf_node(result, last_leaf_node_index);
+
+				std::array<T, BRANCHING_FACTOR> a{};//??? make better constructor on leaf_node that avoids copying twice.
+
+				//	Copy existing values.
+				std::copy(&prev_leaf.get_leaf_node()->_values[0], &prev_leaf.get_leaf_node()->_values[last_leaf_size], a.begin());
+
+				//	Append our new values.
+				std::copy(&values[source_pos], &values[source_pos + copy_count], a.begin() + last_leaf_size);
+
+				const auto new_leaf_node = make_leaf_node(a);
+				node_ref<T> new_root = replace_leaf_node(result.get_root(), result.get_shift(), last_leaf_node_index, new_leaf_node);
+				result = vector<T>(new_root, result.size() + copy_count, result.get_shift());
+				source_pos += copy_count;
+
+
+
+#endif
 			}
 		}
 
