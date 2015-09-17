@@ -8,8 +8,8 @@
 
 NOW
 ====================================================================================================================
-[optimization] optimize pop_back()
 [optimization] Append leaf by leaf when copying data etc.
+[optimization] optimize pop_back()
 [feature] Name library
 
 
@@ -582,11 +582,12 @@ namespace {
 
 
 	template <class T>
-	node_ref<T> find_leaf_node(const node_ref<T>& root_node, size_t size, int shift, size_t index){
-		ASSERT(tree_check_invariant(root_node, size));
-		ASSERT(index < size);
+	node_ref<T> find_leaf_node(const vector<T>& original, size_t index){
+		ASSERT(original.check_invariant());
+		ASSERT(index < original.size());
 
-		node_ref<T> node_it = root_node;
+		auto shift = original.get_shift();
+		node_ref<T> node_it = original.get_root();
 
 		//	Traverse all inodes.
 		while(shift > 0){
@@ -604,11 +605,46 @@ namespace {
 	/*
 		node: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
 
-		shift:
+		shift: shift for current level in tree.
+		leaf_index: index of the leaf node.
+		new_leaf: new leaf node.
+		result: copy of "tree" that has new_leaf replaced. Same size as original.
+			result-tree and original tree shares internal state.
+	*/
+	template <class T>
+	node_ref<T> replace_leaf_node(const node_ref<T>& node, int shift, size_t leaf_index, const node_ref<T>& new_leaf){
+		ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
+		ASSERT(new_leaf.check_invariant());
+
+		const size_t slot_index = (leaf_index >> shift) & BRANCHING_FACTOR_MASK;
+
+		if(shift == LEAF_NODE_SHIFT){
+			ASSERT(node.get_type() == node_type::leaf_node);
+
+			return new_leaf;
+		}
+		else{
+			ASSERT(node.get_type() == node_type::inode);
+
+			const auto child = node.get_inode()->get_child(slot_index);
+			auto child2 = replace_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, index, new_leaf);
+
+			auto children = node.get_inode()->get_child_array();
+			children[slot_index] = child2;
+			auto copy = make_inode_from_array(children);
+			return copy;
+		}
+	}
+
+
+	/*
+		node: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
+
+		shift: shift for current level in tree.
 		index: entry to store "value" to.
 		value: value to store.
 		result: copy of "tree" that has "value" stored. Same size as original.
-			result-tree and original tree shares internal state
+			result-tree and original tree shares internal state.
 	*/
 	template <class T>
 	node_ref<T> replace_value(const node_ref<T>& node, int shift, size_t index, const T& value){
@@ -619,8 +655,10 @@ namespace {
 			ASSERT(node.get_type() == node_type::leaf_node);
 
 			auto copy = node_ref<T>(new leaf_node<T>(node.get_leaf_node()->_values));
+
 			ASSERT(slot_index < copy.get_leaf_node()->_values.size());
 			copy.get_leaf_node()->_values[slot_index] = value;
+
 			return copy;
 		}
 		else{
@@ -651,12 +689,14 @@ namespace {
 
 	/*
 		original: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
-		size: current number of values in tree.
+		index: point to location of new leaf-mode = current number of values in tree.
 		value: value to store.
 		result: copy of "tree" that has "value" stored. Same size as original.
 			result-tree and original tree shares internal state
 
 		New tree may be same depth or +1 deep.
+
+		Cannot append node when root gets full!
 	*/
 	template <class T>
 	node_ref<T> append_leaf_node(const node_ref<T>& original, int shift, size_t index, const node_ref<T>& append){
@@ -664,6 +704,9 @@ namespace {
 		ASSERT(original.get_type() == node_type::inode);
 		ASSERT(append.check_invariant());
 		ASSERT(append.get_type() == node_type::leaf_node);
+
+//		const size_t max_room = BRANCHING_FACTOR << shift;
+//		ASSERT(index <= max_room);
 
 		size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
 		auto children = original.get_inode()->get_child_array();
@@ -684,6 +727,48 @@ namespace {
 				node_ref<T> child2 = append_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, index, append);
 				children[slot_index] = child2;
 				return make_inode_from_array<T>(children);
+			}
+		}
+	}
+
+
+	/*
+		Original must be a multiple of BRANCHING_FACTOR - no partial leaf node.
+	*/
+	template <class T>
+	vector<T> push_back_leaf(const vector<T>& original, const node_ref<T>& new_leaf, size_t leaf_item_count){
+		ASSERT(original.check_invariant());
+		ASSERT(new_leaf.check_invariant());
+		ASSERT(new_leaf.get_type() == node_type::leaf_node);
+		ASSERT((original.size() & BRANCHING_FACTOR_MASK) == 0);
+		ASSERT(leaf_item_count <= BRANCHING_FACTOR);
+
+		const auto original_size = original.size();
+		const auto original_shift = original.get_shift();
+
+		if(original_size == 0){
+			const auto result = vector<T>(new_leaf, leaf_item_count, LEAF_NODE_SHIFT);
+			ASSERT(result.check_invariant());
+			return result;
+		}
+		else{
+
+			//	### no need to calculate shift2 from scratch, just compare (1 << original_shift) and (size + 1).
+			auto shift2 = vector_size_to_shift(original_size + leaf_item_count);
+
+			//	Space left in root?
+			if(shift2 == original_shift){
+				const auto root = append_leaf_node(original.get_root(), original_shift, original_size, new_leaf);
+				const auto result = vector<T>(root, original_size + leaf_item_count, original_shift);
+				ASSERT(result.check_invariant());
+				return result;
+			}
+			else{
+				auto new_path = make_new_path(original_shift, new_leaf);
+				auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
+				const auto result = vector<T>(new_root, original_size + leaf_item_count, shift2);
+				ASSERT(result.check_invariant());
+				return result;
 			}
 		}
 	}
@@ -730,52 +815,6 @@ namespace {
 
 
 	/*
-		Very fast if input vector is a multiple of BRANCHING_FACTOR big.
-	*/
-	template <class T>
-	vector<T> push_back_leaf(const vector<T>& original, const std::array<T, BRANCHING_FACTOR>& values){
-		ASSERT(original.check_invariant());
-
-		const auto original_size = original.get_size();
-		const auto original_shift = original.get_shift();
-
-		if(original_size == 0){
-			return vector<T>(make_leaf_node<T>(values), BRANCHING_FACTOR);
-		}
-		else{
-			//	Slow path - if vector isn't aligned on BRANCHING_FACTOR.
-			if((original_size & BRANCHING_FACTOR_MASK) != 0){
-				vector<T> result = original;
-				for(size_t i = 0 ; i < BRANCHING_FACTOR_MASK ; i++){
-					result = result.push_back(values[i]);
-				}
-			}
-
-			//	Fast path - make a new full leaf node and append it in one go.
-			else{
-				const auto leaf = make_leaf_node<T>(values);
-
-				//	### no need to calculate shift2 from scratch, just compare (1 << original_shift) and (size + 1).
-				auto shift2 = vector_size_to_shift(original_size + 1);
-
-				//	Space left in root?
-				if(shift2 == original_shift){
-					const auto root = append_leaf_node(original.get_root(), original_shift, original_size, leaf);
-					return vector<T>(root, original_size + BRANCHING_FACTOR);
-				}
-				else{
-					auto new_path = make_new_path(original_shift, leaf);
-					auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
-					return vector<T>(new_root, original_size + BRANCHING_FACTOR);
-				}
-			}
-		}
-	}
-
-
-
-
-	/*
 		This is the central building block: adds many values to a vector (or a create a new vector) fast.
 	*/
 #if false
@@ -806,36 +845,33 @@ namespace {
 		*/
 		{
 			size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
-			size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
-			for(size_t i = 0 ; i < copy_count ; i++){
-				//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
-				//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
+			if(last_leaf_size > 0){
+				size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
+				for(size_t i = 0 ; i < copy_count ; i++){
+					//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
+					//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
 
-				result = push_back_1(result, values[source_pos]);
-				source_pos++;
+					result = push_back_1(result, values[source_pos]);
+					source_pos++;
+				}
 			}
 		}
 
 		/*
-			Append _entire leaf nodes_ while there are enough source values.
-		*/
-		while((source_pos + BRANCHING_FACTOR) <= count){
-			ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
-
-			for(size_t i = 0 ; i < BRANCHING_FACTOR ; i++){
-				result = push_back_1(result, values[source_pos]);
-				source_pos++;
-			}
-		}
-
-		/*
-			3) If there are values left for a partial leaf node, make that leaf node now.
+			Append _entire leaf nodes_ while there are enough source values. Includes appending a last, partial leaf.
 		*/
 		if(source_pos < count){
-			size_t copy = count - source_pos;
-			for(size_t i = 0 ; i < copy ; i++){
-				result = push_back_1(result, values[source_pos]);
-				source_pos++;
+			std::array<T, BRANCHING_FACTOR> a{};//??? make better constructor on leaf_node that avoids copying twice.
+			while(source_pos < count){
+				ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
+
+				size_t batch_count = std::min(count - source_pos, static_cast<size_t>(BRANCHING_FACTOR));
+
+				std::copy(&values[source_pos], &values[source_pos + batch_count], a.begin());
+				const auto new_leaf_node = make_leaf_node(a);
+				result = push_back_leaf(result, new_leaf_node, batch_count);
+
+				source_pos += batch_count;
 			}
 		}
 
@@ -1051,7 +1087,7 @@ T vector<T>::operator[](const std::size_t index) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	const auto leaf = find_leaf_node(_root, _size, _shift, index);
+	const auto leaf = find_leaf_node(*this, index);
 	const auto slot_index = index & BRANCHING_FACTOR_MASK;
 
 	ASSERT(slot_index < leaf.get_leaf_node()->_values.size());
