@@ -10,7 +10,8 @@
 namespace steady {
 
 	//	Change BRANCHING_FACTOR_SHIFT to get different branching factors. Number of bits per inode.
-	static const int BRANCHING_FACTOR_SHIFT = 2;
+	//	5 ( = 32 values per node) is ideal.
+	static const int BRANCHING_FACTOR_SHIFT = 3;
 
 
 
@@ -32,17 +33,9 @@ namespace steady {
 		struct node_ref {
 			public: node_ref();
 
-			//	Will assume ownership of the input node - caller must not delete it after call returns.
-			//	Adds ref.
-			//	node == nullptr => null_node
 			public: node_ref(inode<T>* node);
-
-			//	Will assume ownership of the input node - caller must not delete it after call returns.
-			//	Adds ref.
-			//	node == nullptr => null_node
 			public: node_ref(leaf_node<T>* node);
 
-			//	Uses reference counting to share all state.
 			public: node_ref(const node_ref<T>& ref);
 
 			public: ~node_ref();

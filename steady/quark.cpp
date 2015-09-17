@@ -41,6 +41,8 @@ void set_runtime(runtime_i* iRuntime){
 
 #if QUARK__ASSERT_ON
 
+//	!!!! SET A BREAK POINT HERE USING YOUR DEBUGGER TO INSPECT ANY ASSERTS
+
 void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]){
 	assert(runtime != nullptr);
 	assert(expression != nullptr);
@@ -93,6 +95,8 @@ void on_trace_hook(runtime_i* runtime, const std::stringstream& s){
 
 
 #if QUARK__UNIT_TESTS_ON
+
+//	!!!! SET A BREAK POINT HERE USING YOUR DEBUGGER TO INSPECT ANY ASSERTS
 
 void on_unit_test_failed_hook(runtime_i* runtime, const source_code_location& location, const char expression[]){
 	assert(runtime != nullptr);

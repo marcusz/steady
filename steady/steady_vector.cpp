@@ -30,6 +30,8 @@ SOMEDAY
 
 [optimization] optimize operator==()
 
+[optimization] Make inode use one pointer - not two - for each child.
+
 [feature] Make memory allocation hookable.
 
 [feature] Add subvec() - trimming and no trimming (= very fast).
@@ -123,15 +125,19 @@ struct leaf_node {
 
 namespace {
 
-
+	/*
+		Validates the list, not that the children är valid.
+	*/
 	template <class T>
 	bool validate_inode_children(const std::array<node_ref<T>, BRANCHING_FACTOR>& vec){
 		ASSERT(vec.size() >= 0);
 		ASSERT(vec.size() <= BRANCHING_FACTOR);
 
+/*
 		for(auto i: vec){
 			i.check_invariant();
 		}
+*/
 
 		if(vec.size() > 0){
 			const auto type = vec[0].get_type();
@@ -284,6 +290,9 @@ node_ref<T>::node_ref() :
 	ASSERT(check_invariant());
 }
 
+//	Will assume ownership of the input node - caller must not delete it after call returns.
+//	Adds ref.
+//	node == nullptr => null_node
 template <typename T>
 node_ref<T>::node_ref(inode<T>* node) :
 	_inode(nullptr),
@@ -300,6 +309,9 @@ node_ref<T>::node_ref(inode<T>* node) :
 	ASSERT(check_invariant());
 }
 
+//	Will assume ownership of the input node - caller must not delete it after call returns.
+//	Adds ref.
+//	node == nullptr => null_node
 template <typename T>
 node_ref<T>::node_ref(leaf_node<T>* node) :
 	_inode(nullptr),
@@ -316,6 +328,7 @@ node_ref<T>::node_ref(leaf_node<T>* node) :
 	ASSERT(check_invariant());
 }
 
+//	Uses reference counting to share all state.
 template <typename T>
 node_ref<T>::node_ref(const node_ref<T>& ref) :
 	_inode(nullptr),
@@ -495,23 +508,26 @@ namespace {
 			return 1 + count_to_depth(leaf_count);
 		}
 	}
-
-	QUARK_UNIT_TEST("", "count_to_depth()", "0", "-1"){
-		VERIFY(count_to_depth(0) == 0);
-
-		VERIFY(count_to_depth(1) == 1);
-		VERIFY(count_to_depth(2) == 1);
-		VERIFY(count_to_depth(3) == 1);
-
-		VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
-		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
-
-		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
-		VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
-	}
+}
 
 
+QUARK_UNIT_TEST("", "count_to_depth()", "0", "-1"){
+	VERIFY(count_to_depth(0) == 0);
 
+	VERIFY(count_to_depth(1) == 1);
+	VERIFY(count_to_depth(2) == 1);
+	VERIFY(count_to_depth(3) == 1);
+
+	VERIFY(count_to_depth(BRANCHING_FACTOR + 1) == 2);
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR) == 2);
+
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR + 1) == 3);
+	VERIFY(count_to_depth(BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR) == 3);
+}
+
+
+
+namespace {
 
 	/*
 		Return how many steps to shift vector-index to get its *top-level* bits.
@@ -1003,7 +1019,7 @@ vector<T> operator+(const vector<T>& a, const vector<T>& b){
 ////////////////////////////////////////////			Unit tests
 
 
-namespace {
+
 
 
 
@@ -1059,8 +1075,8 @@ struct test_fixture {
 		int leaf_expected_diff = leaf_count - _leaf_count;
 
 
-		VERIFY(inode_diff_count == _inode_expected_count);
-		VERIFY(leaf_expected_diff == _leaf_expected_count);
+		ASSERT(inode_diff_count == _inode_expected_count);
+		ASSERT(leaf_expected_diff == _leaf_expected_count);
 	}
 
 	quark::scoped_trace _scoped_tracer;
@@ -1749,8 +1765,6 @@ QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 	const auto c = a + b;
 
 	VERIFY(c.to_vec() == (std::vector<int>{ 2, 3, 4, 5, 6, 7, 8 }));
-}
-
 }
 
 }	//	steady

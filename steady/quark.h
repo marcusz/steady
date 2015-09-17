@@ -108,6 +108,7 @@ namespace quark {
 //	TODO
 //	====================================================================================================================
 
+	Fix so you can put your unit tests inside unnamed namespaces (to make tests internal).
 	internals-namespace
 
 	Add basic exception classes, ala bacteria.
