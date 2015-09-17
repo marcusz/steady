@@ -1149,19 +1149,55 @@ T vector<T>::operator[](const std::size_t index) const{
 	return result;
 }
 
+
+#if false
+
 //	### Optimization potential here.
 template <class T>
 std::vector<T> vector<T>::to_vec() const{
 	ASSERT(check_invariant());
 
-	std::vector<T> a;
+	std::vector<T> result;
+	result.reserve(size());
+
 	for(size_t i = 0 ; i < size() ; i++){
 		const auto value = operator[](i);
-		a.push_back(value);
+		result.push_back(value);
 	}
 
-	return a;
+	return result;
 }
+
+
+#else
+
+
+template <class T>
+std::vector<T> vector<T>::to_vec() const{
+	ASSERT(check_invariant());
+
+	std::vector<T> result;
+	result.reserve(size());
+
+	//	Block-wise copy.
+	size_t block_count = get_block_count();
+	for(size_t index = 0 ; index < block_count ; index++){
+		const T* valuesA = get_block(index);
+		const auto size = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
+		result.insert(result.end(), valuesA, valuesA + size);
+	}
+	return result;
+}
+
+#endif
+
+
+
+
+
+
+
+
 
 
 namespace {
