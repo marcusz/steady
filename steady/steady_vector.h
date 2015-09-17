@@ -72,7 +72,7 @@ namespace steady {
 
 	Vector object is immutable = can never be changed. This makes for robust code and thread safety etc.
 
-	When you modify the vector you always get a copy of the vector with yours changes integrated.
+	When you modify the vector you always get a copy of the vector with your changes integrated.
 
 	Internally the new and old vectors shares most state so this is fast and uses little memory.
 
@@ -80,6 +80,9 @@ namespace steady {
 	Based on Clojure's vector.
 
 	NOTICE: if T has member functions that throws exception, so will vector.
+
+
+	Some member functions have naive implementation that are very slow right now.
 */
 
 

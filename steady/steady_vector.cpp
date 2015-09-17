@@ -8,48 +8,50 @@
 
 NOW
 ====================================================================================================================
-### optimize pop_back()
-### Append leaf by leaf when copying data etc.
-### Name library
+[optimization] optimize pop_back()
+[optimization] Append leaf by leaf when copying data etc.
+[feature] Name library
 
 
 NEXT
 ====================================================================================================================
-### optimize operator==()
+[optimization] Store shift in vector to avoid recomputing it all the time.
 
-Improve tree validation.
+[defect] Exception safety pls!
 
-first(),rest(). Add seq?
+[defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
+
+[internal quality] Improve tree validation.
 
 
 SOMEDAY
 ====================================================================================================================
-### Make memory allocation hookable.
+[feature] first(),rest(). Add seq?
 
-Store shift in vector to avoid recomputing it all the time.
+[optimization] optimize operator==()
 
-subvec - no trimming = very fast.
+[feature] Make memory allocation hookable.
 
-assoc at end => append
+[feature] Add subvec() - trimming and no trimming (= very fast).
 
-pool nodes?
+[feature] Allow assoc() at end of vector => append
 
-Over-alloc / reserve nodes like std::vector<>?
+[optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
 
-??? Exception safety pls!
+[optimization] Over-alloc / reserve nodes like std::vector<>?
 
-??? Path copying requires 31 * 6 RC-bumps!
+[optimization] Path copying requires 31 * 6 RC-bumps!
 
-### Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
+[optimization] Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
 
-### Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
+[optimization] Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
 
-### Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
+[feature] Support different branch factors per instance of vector<T>? BF 2 is great for modification, bad for lookup.
 
-### Support different branch factors per instance of vector<T>? BF 2 is great for modification, bad for lookup.
+[feature] Support holes = allow using for ideal hash.
 
-### Support holes = allow using for ideal hash.
 */
+
 
 //	Give QUARK macros shorter names
 #define ASSERT(x) QUARK_ASSERT(x)
@@ -646,12 +648,12 @@ vector<T>::vector() :
 
 
 template <class T>
-vector<T>::vector(const std::vector<T>& vec) :
+vector<T>::vector(const std::vector<T>& values) :
 	_size(0)
 {
 	//	!!! Illegal to take adress of first element of vec if it's empty.
-	if(!vec.empty()){
-		vector<T> temp(&vec[0], vec.size());
+	if(!values.empty()){
+		vector<T> temp(&values[0], values.size());
 		temp.swap(*this);
 	}
 
@@ -1017,9 +1019,12 @@ QUARK_UNIT_TEST("std::vector<>", "auto convertion from initializer list", "", ""
 	vector_test({ 8, 9, 10});
 }
 
+////////////////////////////////////////////			test_fixture<T>
 
-
-
+/*
+	Fixture class that you put on the stack in your unit tests.
+	It makes sure the total count of leaf_node<T> and inode<T> are as expected - no leakage.
+*/
 template <class T>
 struct test_fixture {
 	test_fixture() :
@@ -1030,6 +1035,9 @@ struct test_fixture {
 		TRACE_SS("inode count: " << _inode_count << " " << "Leaf node count: " << _leaf_count);
 	}
 
+	/*
+		Use this constructor when you *expect* the number of nodes to have grown when test_fixture destructs.
+	*/
 	test_fixture(int inode_expected_count, int leaf_expected_count) :
 		_scoped_tracer("test_fixture"),
 		_inode_count(inode<T>::_debug_count),
@@ -1090,8 +1098,6 @@ QUARK_UNIT_TEST("", "test_fixture()", "1 inode, 2 leaf nodes", "correct state (a
 		VERIFY(test._leaf_expected_count == 2);
 	}
 }
-
-
 
 
 
@@ -1251,7 +1257,6 @@ QUARK_UNIT_TEST("", "make_manual_vector_branchfactor_plus_1()", "", "correct nod
 		inode
 			leaf_node
 */
-
 vector<int> make_manual_vector_branchfactor_square_plus_1(){
 	test_fixture<int> f(3, BRANCHING_FACTOR + 1);
 
