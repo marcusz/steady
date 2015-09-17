@@ -9,6 +9,14 @@ Why: the low-level bits standard C++ is missing. Tracing, asserts, unit tests. T
 minimalism.
 
 
+Configure by settings these flags in your compiler settings:
+
+	#define QUARK__ASSERT_ON true
+	#define QUARK__TRACE_ON true
+	#define QUARK__UNIT_TESTS_ON true
+
+
+
 TRACING
 ------------------------------------------------------------------------------------------------------------------------
 Quark has primitives for tracing that can be routed and enabled / disabled. Includes support for indenting the log.
@@ -96,9 +104,18 @@ Examples:
 #include <sstream>
 
 
-#define QUARK__ASSERT_ON true
-#define QUARK__TRACE_ON true
-#define QUARK__UNIT_TESTS_ON true
+#ifndef QUARK__ASSERT_ON
+	#define QUARK__ASSERT_ON true
+#endif
+
+#ifndef QUARK__TRACE_ON
+	#define QUARK__TRACE_ON true
+#endif
+
+#ifndef QUARK__UNIT_TESTS_ON
+	#define QUARK__UNIT_TESTS_ON true
+#endif
+
 
 
 namespace quark {
@@ -245,64 +262,33 @@ void set_runtime(runtime_i* iRuntime);
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
-struct scoped_trace {
-	scoped_trace(const char s[]){
 #if QUARK__TRACE_ON
-		runtime_i* r = get_runtime();
-		r->runtime_i__trace(s);
-		r->runtime_i__trace("{");
-		r->runtime_i__add_log_indent(1);
-#endif
-	}
 
-	scoped_trace(const std::string& s){
-#if QUARK__TRACE_ON
-		runtime_i* r = get_runtime();
-		r->runtime_i__trace(s.c_str());
-		r->runtime_i__trace("{");
-		r->runtime_i__add_log_indent(1);
-#endif
-	}
+	struct scoped_trace {
+		scoped_trace(const char s[]){
+			runtime_i* r = get_runtime();
+			r->runtime_i__trace(s);
+			r->runtime_i__trace("{");
+			r->runtime_i__add_log_indent(1);
+		}
 
-	scoped_trace(const std::stringstream& s){
-#if QUARK__TRACE_ON
-		runtime_i* r = get_runtime();
-		r->runtime_i__trace(s.str().c_str());
-		r->runtime_i__trace("{");
-		r->runtime_i__add_log_indent(1);
-#endif
-	}
+		scoped_trace(const std::string& s){
+			runtime_i* r = get_runtime();
+			r->runtime_i__trace(s.c_str());
+			r->runtime_i__trace("{");
+			r->runtime_i__add_log_indent(1);
+		}
 
-	~scoped_trace(){
-#if QUARK__TRACE_ON
-		runtime_i* r = get_runtime();
-		r->runtime_i__add_log_indent(-1);
-		r->runtime_i__trace("}");
-#endif
-	}
-};
+		~scoped_trace(){
+			runtime_i* r = get_runtime();
+			r->runtime_i__add_log_indent(-1);
+			if(_trace_brackets){
+				r->runtime_i__trace("}");
+			}
+		}
 
-
-////////////////////////////		scoped_trace_indent
-/*
-	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
-*/
-
-struct scoped_trace_indent {
-#if QUARK__TRACE_ON
-	scoped_trace_indent(){
-		runtime_i* r = get_runtime();
-		r->runtime_i__add_log_indent(1);
-	}
-	~scoped_trace_indent(){
-		runtime_i* r = get_runtime();
-		r->runtime_i__add_log_indent(-1);
-	}
-#endif
-};
-
-
-#if QUARK__TRACE_ON
+		private: bool _trace_brackets = true;
+	};
 
 	////////////////////////////		Hook functions.
 	/*
@@ -317,13 +303,7 @@ struct scoped_trace_indent {
 	#define QUARK_TRACE(s) ::quark::on_trace_hook(::quark::get_runtime(), s)
 	#define QUARK_TRACE_SS(x) {std::stringstream ss; ss << x; ::quark::on_trace_hook(::quark::get_runtime(), ss);}
 
-	/*
-		Works with:
-			char[]
-			std::string
-	*/
 	#define QUARK_SCOPED_TRACE(s) ::quark::scoped_trace QUARK_UNIQUE_LABEL(scoped_trace) (s)
-	#define QUARK_SCOPED_INDENT() ::quark::scoped_trace_indent QUARK_UNIQUE_LABEL(scoped_indent)
 
 	#define QUARK_TRACE_FUNCTION() ::quark::scoped_trace QUARK_UNIQUE_LABEL(trace_function) (__FUNCTION__)
 
@@ -333,7 +313,6 @@ struct scoped_trace_indent {
 	#define QUARK_TRACE_SS(s)
 
 	#define QUARK_SCOPED_TRACE(s)
-	#define QUARK_SCOPED_INDENT()
 	#define QUARK_TRACE_FUNCTION()
 
 #endif

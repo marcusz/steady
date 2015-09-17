@@ -10,6 +10,16 @@
 
 namespace quark {
 
+
+//	Force compiler error if these flags has not been setup.
+bool assert_on = QUARK__ASSERT_ON;
+bool trace_on = QUARK__TRACE_ON;
+bool unit_tests_on = QUARK__UNIT_TESTS_ON;
+
+
+
+
+
 #if QUARK__UNIT_TESTS_ON
 	unit_test_registry* unit_test_rec::_registry_instance = nullptr;
 #endif
@@ -223,8 +233,8 @@ void test_macros(){
 
 	QUARK_TRACE("hello");
 	QUARK_TRACE_SS("hello" << 1234);
-	QUARK_SCOPED_TRACE("scoped trace");
-	QUARK_SCOPED_INDENT();
+	QUARK_SCOPED_TRACE("");
+	QUARK_SCOPED_TRACE(std::string("scoped trace") + "std::string version");
 	QUARK_TRACE_FUNCTION();
 }
 

@@ -1250,9 +1250,6 @@ std::vector<T> vector<T>::to_vec() const{
 
 
 
-
-
-
 namespace {
 	template <class T>
 	void trace_node(const std::string& prefix, const node_ref<T>& node){
@@ -1260,8 +1257,9 @@ namespace {
 			TRACE_SS(prefix << "<null>");
 		}
 		else if(node.get_type() == node_type::inode){
-			TRACE_SS(prefix << "<inode> RC: " << node.get_inode()->_rc);
-			QUARK_SCOPED_INDENT();
+			std::stringstream s;
+			s << prefix << "<inode> RC: " << node.get_inode()->_rc;
+			QUARK_SCOPED_TRACE(s.str());
 
 			int index = 0;
 			for(auto i: node.get_inode()->get_child_array()){
@@ -1270,8 +1268,9 @@ namespace {
 			}
 		}
 		else if(node.get_type() == node_type::leaf_node){
-			TRACE_SS(prefix << "<leaf> RC: " << node.get_leaf_node()->_rc);
-			QUARK_SCOPED_INDENT();
+			std::stringstream s;
+			s << prefix << "<leaf> RC: " << node.get_leaf_node()->_rc;
+			QUARK_SCOPED_TRACE(s.str());
 
 			int index = 0;
 			for(auto i: node.get_leaf_node()->_values){
