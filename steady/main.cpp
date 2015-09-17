@@ -107,16 +107,15 @@ void Example(){
 		Try vectors of strings instead of ints.
 	*/
 	{
-//		using std::string;
+		using std::string;
 
-		const steady::vector<std::string> a{ "one", "two", "three" };
-
-		const steady::vector<std::string> b{ "four", "five" };
+		const steady::vector<string> a{ "one", "two", "three" };
+		const steady::vector<string> b{ "four", "five" };
 		const auto c = a + b;
 
-		assert(a == (steady::vector<std::string>{ "one", "two", "three" }));
-		assert(b == (steady::vector<std::string>{ "four", "five" }));
-		assert(c == (steady::vector<std::string>{ "one", "two", "three", "four", "five" }));
+		assert(a == (steady::vector<string>{ "one", "two", "three" }));
+		assert(b == (steady::vector<string>{ "four", "five" }));
+		assert(c == (steady::vector<string>{ "one", "two", "three", "four", "five" }));
 	}
 
 
