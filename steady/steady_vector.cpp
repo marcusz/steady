@@ -67,7 +67,6 @@ namespace steady {
 
 namespace internals {
 
-	static const int BRANCHING_FACTOR = 1 << BRANCHING_FACTOR_SHIFT;
 	static const size_t BRANCHING_FACTOR_MASK = (BRANCHING_FACTOR - 1);
 
 
@@ -584,6 +583,8 @@ namespace {
 	}
 
 
+
+
 	template <class T>
 	node_ref<T> find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
 		ASSERT(tree_check_invariant(tree, size));
@@ -642,6 +643,218 @@ namespace {
 	}
 
 
+	template <class T>
+	node_ref<T> make_new_path(int shift, const node_ref<T>& append){
+		if(shift == 0){
+			return append;
+		}
+		else{
+			auto a = make_new_path(shift - BRANCHING_FACTOR_SHIFT, append);
+			node_ref<T> b = make_inode_from_array<T>({ a });
+			return b;
+		}
+	}
+
+	/*
+		original: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
+		size: current number of values in tree.
+		value: value to store.
+		result: copy of "tree" that has "value" stored. Same size as original.
+			result-tree and original tree shares internal state
+
+		New tree may be same depth or +1 deep.
+	*/
+	template <class T>
+	node_ref<T> append_leaf_node(const node_ref<T>& original, int shift, size_t index, const node_ref<T>& append){
+		ASSERT(original.check_invariant());
+		ASSERT(original.get_type() == node_type::inode);
+		ASSERT(append.check_invariant());
+		ASSERT(append.get_type() == node_type::leaf_node);
+
+		size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
+		auto children = original.get_inode()->get_child_array();
+
+		//	Lowest level inode, pointing to leaf nodes.
+		if(shift == BRANCHING_FACTOR_SHIFT){
+			children[slot_index] = append;
+			return make_inode_from_array<T>(children);
+		}
+		else {
+			const auto child = children[slot_index];
+			if(child.get_type() == node_type::null_node){
+				node_ref<T> child2 = make_new_path(shift - BRANCHING_FACTOR_SHIFT, append);
+				children[slot_index] = child2;
+				return make_inode_from_array<T>(children);
+			}
+			else{
+				node_ref<T> child2 = append_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, index, append);
+				children[slot_index] = child2;
+				return make_inode_from_array<T>(children);
+			}
+		}
+	}
+
+
+	template <class T>
+	vector<T> push_back_1(const vector<T>& original, const T& value){
+		ASSERT(original.check_invariant());
+
+		const auto original_size = original.size();
+		if(original_size == 0){
+			return vector<T>(make_leaf_node<T>({value}), 1);
+		}
+		else{
+
+			//	Does last leaf node have space left? Then we can use modify_existing_value()...
+			if((original_size & BRANCHING_FACTOR_MASK) != 0){
+				auto shift = vector_size_to_shift(original_size);
+				const auto root = modify_existing_value(original.get_root(), shift, original_size, value);
+				return vector<T>(root, original_size + 1);
+			}
+
+			//	Allocate new *leaf-node*, adding it to tree.
+			else{
+				const auto leaf = make_leaf_node<T>({ value });
+
+				auto shift = vector_size_to_shift(original_size);
+				auto shift2 = vector_size_to_shift(original_size + 1);
+
+				//	Space left in root?
+				if(shift2 == shift){
+					const auto root = append_leaf_node(original.get_root(), shift, original_size, leaf);
+					return vector<T>(root, original_size + 1);
+				}
+				else{
+					auto new_path = make_new_path(shift, leaf);
+					auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
+					return vector<T>(new_root, original_size + 1);
+				}
+			}
+		}
+	}
+
+
+	/*
+		Very fast if input vector is a multiple of BRANCHING_FACTOR big.
+	*/
+	template <class T>
+	vector<T> push_back_leaf(const vector<T>& original, const std::array<T, BRANCHING_FACTOR>& values){
+		ASSERT(original.check_invariant());
+
+		const auto original_size = original.get_size();
+		if(original_size == 0){
+			return vector<T>(make_leaf_node<T>(values), BRANCHING_FACTOR);
+		}
+		else{
+			//	Slow path - if vector isn't aligned on BRANCHING_FACTOR.
+			if((original_size & BRANCHING_FACTOR_MASK) != 0){
+				vector<T> result = original;
+				for(size_t i = 0 ; i < BRANCHING_FACTOR_MASK ; i++){
+					result = result.push_back(values[i]);
+				}
+			}
+
+			//	Fast path - make a new full leaf node and append it in one go.
+			else{
+				const auto leaf = make_leaf_node<T>(values);
+
+				auto shift = vector_size_to_shift(original_size);
+				auto shift2 = vector_size_to_shift(original_size + 1);
+
+				//	Space left in root?
+				if(shift2 == shift){
+					const auto root = append_leaf_node(original.get_root(), shift, original_size, leaf);
+					return vector<T>(root, original_size + BRANCHING_FACTOR);
+				}
+				else{
+					auto new_path = make_new_path(shift, leaf);
+					auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
+					return vector<T>(new_root, original_size + BRANCHING_FACTOR);
+				}
+			}
+		}
+	}
+
+
+#if false
+
+	/*
+		This is the central building block to add many values to a vector (or a create a new vector) fast.
+	*/
+	template <class T>
+	vector<T> push_back_batch(const vector<T>& original, const T values, size_t count){
+		ASSERT(original.check_invariant());
+
+		vector<T> result = original;
+
+		size_t source_pos = 0;
+
+		/*
+			1) If the last leaf node is partially filled, pad it out.
+		*/
+		{
+			size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
+			size_t dest_pos = last_leaf_size;
+			while(dest_pos < BRANCHING_FACTOR && source_pos < count){
+			//	### Make a new replace_leaf_node() function and use it! Code is inside modify_existing_value().
+		//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
+
+				result = result.push_back(values[source_pos]);
+				dest_pos++;
+				source_pos++;
+			}
+		}
+
+		/*
+			Append entire leaf nodes while there are enough source values.
+		*/
+		while((source_pos + BRANCHING_FACTOR) <= count){
+		}
+
+		/*
+			3) If there are values left for a partial leaf node, make that leaf node now.
+		*/
+		{
+		}
+
+
+		if(_size == 0){
+			return vector<T>(make_leaf_node<T>({value}), 1);
+		}
+		else{
+
+			//	Does last leaf node have space left? Then we can use modify_existing_value()...
+			if((_size & BRANCHING_FACTOR_MASK) != 0){
+				auto shift = vector_size_to_shift(_size);
+				const auto root = modify_existing_value(_root, shift, _size, value);
+				return vector<T>(root, _size + 1);
+			}
+
+			//	Allocate new *leaf-node*, adding it to tree.
+			else{
+				const auto leaf = make_leaf_node<T>({ value });
+
+				auto shift = vector_size_to_shift(_size);
+				auto shift2 = vector_size_to_shift(_size + 1);
+
+				//	Space left in root?
+				if(shift2 == shift){
+					const auto root = append_leaf_node(_root, shift, _size, leaf);
+					return vector<T>(root, _size + 1);
+				}
+				else{
+					auto new_path = make_new_path(shift, leaf);
+					auto new_root = make_inode_from_array<T>({ _root, new_path });
+					return vector<T>(new_root, _size + 1);
+				}
+			}
+		}
+	}
+
+#endif
+
+
+
 }
 
 
@@ -650,6 +863,7 @@ namespace {
 
 
 /////////////////////////////////////////////			vector
+
 
 
 
@@ -777,104 +991,16 @@ vector<T>::vector(node_ref<T> root, std::size_t size) :
 }
 
 
-
-
-namespace  {
-
-	template <class T>
-	node_ref<T> make_new_path(int shift, const node_ref<T>& append){
-		if(shift == 0){
-			return append;
-		}
-		else{
-			auto a = make_new_path(shift - BRANCHING_FACTOR_SHIFT, append);
-			node_ref<T> b = make_inode_from_array<T>({ a });
-			return b;
-		}
-	}
-
-	/*
-		original: original tree. Not changed by function. Cannot be null node, only inode or leaf node.
-		size: current number of values in tree.
-		value: value to store.
-		result: copy of "tree" that has "value" stored. Same size as original.
-			result-tree and original tree shares internal state
-
-		New tree may be same depth or +1 deep.
-	*/
-	template <class T>
-	node_ref<T> append_leaf_node(const node_ref<T>& original, int shift, size_t index, const node_ref<T>& append){
-		ASSERT(original.check_invariant());
-		ASSERT(original.get_type() == node_type::inode);
-		ASSERT(append.check_invariant());
-		ASSERT(append.get_type() == node_type::leaf_node);
-
-		size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
-		auto children = original.get_inode()->get_child_array();
-
-		//	Lowest level inode, pointing to leaf nodes.
-		if(shift == BRANCHING_FACTOR_SHIFT){
-			children[slot_index] = append;
-			return make_inode_from_array<T>(children);
-		}
-		else {
-			const auto child = children[slot_index];
-			if(child.get_type() == node_type::null_node){
-				node_ref<T> child2 = make_new_path(shift - BRANCHING_FACTOR_SHIFT, append);
-				children[slot_index] = child2;
-				return make_inode_from_array<T>(children);
-			}
-			else{
-				node_ref<T> child2 = append_leaf_node(child, shift - BRANCHING_FACTOR_SHIFT, index, append);
-				children[slot_index] = child2;
-				return make_inode_from_array<T>(children);
-			}
-		}
-	}
-
-}
-
-
 template <class T>
 vector<T> vector<T>::push_back(const T& value) const{
 	ASSERT(check_invariant());
 
-	if(_size == 0){
-		return vector<T>(make_leaf_node<T>({value}), 1);
-	}
-	else{
-
-		//	Does last leaf node have space left? Then we can use modify_existing_value()...
-		if((_size & BRANCHING_FACTOR_MASK) != 0){
-			auto shift = vector_size_to_shift(_size);
-			const auto root = modify_existing_value(_root, shift, _size, value);
-			return vector<T>(root, _size + 1);
-		}
-
-		//	Allocate new *leaf-node*, adding it to tree.
-		else{
-			const auto leaf = make_leaf_node<T>({ value });
-
-			auto shift = vector_size_to_shift(_size);
-			auto shift2 = vector_size_to_shift(_size + 1);
-
-			//	Space left in root?
-			if(shift2 == shift){
-				const auto root = append_leaf_node(_root, shift, _size, leaf);
-				return vector<T>(root, _size + 1);
-			}
-			else{
-				auto new_path = make_new_path(shift, leaf);
-				auto new_root = make_inode_from_array<T>({ _root, new_path });
-				return vector<T>(new_root, _size + 1);
-			}
-		}
-	}
+	return push_back_1(*this, value);
 }
 
 
 /*
-	Correct but inefficient.
+	### Correct but inefficient.
 */
 template <class T>
 vector<T> vector<T>::pop_back() const{
@@ -888,7 +1014,7 @@ vector<T> vector<T>::pop_back() const{
 
 
 /*
-	Correct but inefficient.
+	### Correct but inefficient.
 */
 template <class T>
 bool vector<T>::operator==(const vector& rhs) const{

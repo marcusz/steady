@@ -14,6 +14,7 @@ namespace steady {
 	static const int BRANCHING_FACTOR_SHIFT = 3;
 
 
+	static const int BRANCHING_FACTOR = 1 << BRANCHING_FACTOR_SHIFT;
 
 	namespace internals {
 		template <typename T> struct node_ref;
