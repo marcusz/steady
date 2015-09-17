@@ -11,6 +11,10 @@ NOW
 [optimization] optimize pop_back()
 [feature] Name library
 
+Local control of precompiler:
+	STEADY_ASSERT()
+	STEADY_TRACE_ON etc
+
 
 NEXT
 ====================================================================================================================
@@ -33,7 +37,7 @@ SOMEDAY
 
 [feature] Add subvec() - trimming and no trimming (= very fast).
 
-[feature] Allow assoc() at end of vector => append
+[feature] Allow store() at end of vector => append
 
 [optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
 
@@ -1104,8 +1108,69 @@ vector<T> vector<T>::pop_back() const{
 
 
 
+
+
+/*
+	### Correct but inefficient.
+*/
+#if 0
 template <class T>
-vector<T> vector<T>::assoc(size_t index, const T& value) const{
+bool vector<T>::operator==(const vector& rhs) const{
+	ASSERT(check_invariant());
+
+	const auto a = to_vec();
+	const auto b = rhs.to_vec();
+	return a == b;
+}
+
+#else
+
+template <class T>
+bool vector<T>::operator==(const vector& rhs) const{
+	ASSERT(check_invariant());
+
+	if(_size != rhs._size){
+		return false;
+	}
+	if(_size == 0){
+		return true;
+	}
+
+	if(_root.get_type() != rhs._root.get_type()){
+		return false;
+	}
+	if(_root.get_type() == node_type::inode && _root.get_inode() == rhs._root.get_inode()){
+		return true;
+	}
+	if(_root.get_type() == node_type::leaf_node && _root.get_leaf_node() == rhs._root.get_leaf_node()){
+		return true;
+	}
+
+	//	### optimize by comparing node by node, hiearchically.
+	//	First check node to see if they are the same pointer. If not, only then compare their values.
+
+	{
+		size_t block_count = get_block_count();
+		for(size_t index = 0 ; index < block_count ; index++){
+			const T* valuesA = get_block(index);
+			const T* valuesB = rhs.get_block(index);
+
+			size_t r = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
+			bool equal = std::equal(valuesA, valuesA + r, valuesB);
+			if(!equal){
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+#endif
+
+
+template <class T>
+vector<T> vector<T>::store(size_t index, const T& value) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
@@ -1627,42 +1692,42 @@ QUARK_UNIT_TEST("vector", "operator[]", "Branchfactor^2 + 1 values", "read back"
 }
 
 
-////////////////////////////////////////////		vector::assoc()
+////////////////////////////////////////////		vector::store()
 
 
-QUARK_UNIT_TEST("vector", "assoc()", "1 value", "read back"){
+QUARK_UNIT_TEST("vector", "store()", "1 value", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector1();
-	const auto b = a.assoc(0, 1000);
+	const auto b = a.store(0, 1000);
 	VERIFY(a[0] == 7);
 	VERIFY(b[0] == 1000);
 	a.trace_internals();
 }
 
-QUARK_UNIT_TEST("vector", "assoc()", "5 value vector, replace #0", "read back"){
+QUARK_UNIT_TEST("vector", "store()", "5 value vector, replace #0", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_plus_1();
-	const auto b = a.assoc(0, 1000);
+	const auto b = a.store(0, 1000);
 	VERIFY(a[0] == 7);
 	VERIFY(b[0] == 1000);
 }
 
-QUARK_UNIT_TEST("vector", "assoc()", "5 value vector, replace #4", "read back"){
+QUARK_UNIT_TEST("vector", "store()", "5 value vector, replace #4", "read back"){
 	test_fixture<int> f;
 	const auto a = make_manual_vector_branchfactor_plus_1();
-	const auto b = a.assoc(4, 1000);
+	const auto b = a.store(4, 1000);
 	VERIFY(a[0] == 7);
 	VERIFY(b[4] == 1000);
 }
 
-QUARK_UNIT_TEST("vector", "assoc()", "17 value vector, replace bunch", "read back"){
+QUARK_UNIT_TEST("vector", "store()", "17 value vector, replace bunch", "read back"){
 	test_fixture<int> f;
 	auto a = make_manual_vector_branchfactor_square_plus_1();
-	a = a.assoc(4, 1004);
-	a = a.assoc(5, 1005);
-	a = a.assoc(0, 1000);
-	a = a.assoc(16, 1016);
-	a = a.assoc(10, 1010);
+	a = a.store(4, 1004);
+	a = a.store(5, 1005);
+	a = a.store(0, 1000);
+	a = a.store(16, 1016);
+	a = a.store(10, 1010);
 
 	VERIFY(a[0] == 1000);
 	VERIFY(a[4] == 1004);
@@ -1673,12 +1738,12 @@ QUARK_UNIT_TEST("vector", "assoc()", "17 value vector, replace bunch", "read bac
 	a.trace_internals();
 }
 
-QUARK_UNIT_TEST("vector", "assoc()", "5 value vector, replace value 10000 times", "read back"){
+QUARK_UNIT_TEST("vector", "store()", "5 value vector, replace value 10000 times", "read back"){
 	test_fixture<int> f;
 	auto a = make_manual_vector_branchfactor_plus_1();
 
 	for(int i = 0 ; i < 1000 ; i++){
-		a = a.assoc(4, i);
+		a = a.store(4, i);
 	}
 	VERIFY(a[4] == 999);
 
@@ -2014,68 +2079,25 @@ QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 
 
 
+////////////////////////////////////////////		T = std::string
 
 
+#if 1
+QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
+	using std::string;
+	test_fixture<string> f;
 
+	const steady::vector<string> a{ "one", "two", "three" };
 
+	const steady::vector<string> b{ "four", "five" };
+	const auto c = a + b;
 
-/*
-	### Correct but inefficient.
-*/
-#if 0
-template <class T>
-bool vector<T>::operator==(const vector& rhs) const{
-	ASSERT(check_invariant());
-
-	const auto a = to_vec();
-	const auto b = rhs.to_vec();
-	return a == b;
+	assert(a == (steady::vector<string>{ "one", "two", "three" }));
+	assert(b == (steady::vector<string>{ "four", "five" }));
+	assert(c == (steady::vector<string>{ "one", "two", "three", "four", "five" }));
 }
-
-#else
-
-template <class T>
-bool vector<T>::operator==(const vector& rhs) const{
-	ASSERT(check_invariant());
-
-	if(_size != rhs._size){
-		return false;
-	}
-	if(_size == 0){
-		return true;
-	}
-
-	if(_root.get_type() != rhs._root.get_type()){
-		return false;
-	}
-	if(_root.get_type() == node_type::inode && _root.get_inode() == rhs._root.get_inode()){
-		return true;
-	}
-	if(_root.get_type() == node_type::leaf_node && _root.get_leaf_node() == rhs._root.get_leaf_node()){
-		return true;
-	}
-
-	//	### optimize by comparing node by node, hiearchically.
-	//	First check node to see if they are the same pointer. If not, only then compare their values.
-
-	{
-		size_t block_count = get_block_count();
-		for(size_t index = 0 ; index < block_count ; index++){
-			const T* valuesA = get_block(index);
-			const T* valuesB = rhs.get_block(index);
-
-			size_t r = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
-			bool equal = std::equal(valuesA, valuesA + r, valuesB);
-			if(!equal){
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
-
 #endif
+
 
 }	//	steady
 

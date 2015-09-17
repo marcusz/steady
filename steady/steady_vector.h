@@ -184,7 +184,7 @@ class vector {
 		value: new value to store
 		return: new copy of the vector with _value_ stored at the _index_.
 	*/
-	public: vector assoc(size_t index, const T& value) const;
+	public: vector store(size_t index, const T& value) const;
 
 	/*
 		Append value to the end of the vector, returning a vector with size + 1.
