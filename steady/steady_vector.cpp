@@ -554,6 +554,40 @@ namespace {
 		int shift = (count_to_depth(size) - 1) * BRANCHING_FACTOR_SHIFT;
 		return shift;
 	}
+}
+
+
+
+QUARK_UNIT_TEST("", "vector_size_to_shift()", "", ""){
+	VERIFY(vector_size_to_shift(0) == EMPTY_TREE_SHIFT);
+	VERIFY(vector_size_to_shift(1) == LEAF_NODE_SHIFT);
+	VERIFY(vector_size_to_shift(BRANCHING_FACTOR * 1) == LEAF_NODE_SHIFT);
+	VERIFY(vector_size_to_shift(BRANCHING_FACTOR * 1 + 1) == LOWEST_LEVEL_INODE_SHIFT);
+}
+
+
+namespace {
+
+	size_t shift_to_max_size(int shift){
+		size_t size = BRANCHING_FACTOR << shift;
+		return size;
+	}
+
+}
+
+QUARK_UNIT_TEST("", "shift_to_max_size()", "", ""){
+	VERIFY(shift_to_max_size(EMPTY_TREE_SHIFT) == 0);
+	VERIFY(shift_to_max_size(LEAF_NODE_SHIFT) == BRANCHING_FACTOR * 1);
+	VERIFY(shift_to_max_size(LOWEST_LEVEL_INODE_SHIFT) == BRANCHING_FACTOR * BRANCHING_FACTOR);
+	VERIFY(shift_to_max_size(BRANCHING_FACTOR_SHIFT * 2) == BRANCHING_FACTOR * BRANCHING_FACTOR * BRANCHING_FACTOR);
+}
+
+
+
+
+
+
+namespace {
 
 	template <class T>
 	node_ref<T> make_leaf_node(const std::array<T, BRANCHING_FACTOR>& values){
@@ -768,12 +802,12 @@ namespace {
 			return result;
 		}
 		else{
-
-			//	### no need to calculate shift2 from scratch, just compare (1 << original_shift) and (size + 1).
-			auto shift2 = vector_size_to_shift(original_size + leaf_item_count);
+			//	How many values can we fit in tree with this shift-constant?
+			size_t max_values = shift_to_max_size(original_shift);
+			bool fits_in_root = (original_size + leaf_item_count) <= max_values;
 
 			//	Space left in root?
-			if(shift2 == original_shift){
+			if(fits_in_root){
 				const auto root = append_leaf_node(original.get_root(), original_shift, original_size, new_leaf);
 				const auto result = vector<T>(root, original_size + leaf_item_count, original_shift);
 				ASSERT(result.check_invariant());
@@ -782,7 +816,7 @@ namespace {
 			else{
 				auto new_path = make_new_path(original_shift, new_leaf);
 				auto new_root = make_inode_from_array<T>({ original.get_root(), new_path });
-				const auto result = vector<T>(new_root, original_size + leaf_item_count, shift2);
+				const auto result = vector<T>(new_root, original_size + leaf_item_count, original_shift + BRANCHING_FACTOR_SHIFT);
 				ASSERT(result.check_invariant());
 				return result;
 			}
@@ -875,14 +909,16 @@ namespace {
 			Append _entire leaf nodes_ while there are enough source values. Includes appending a last, partial leaf.
 		*/
 		if(source_pos < count){
-			std::array<T, BRANCHING_FACTOR> a{};//??? make better constructor on leaf_node that avoids copying twice.
 			while(source_pos < count){
 				ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
 
+				auto new_leaf_node = node_ref<T>(new leaf_node<T>());
 				size_t batch_count = std::min(count - source_pos, static_cast<size_t>(BRANCHING_FACTOR));
 
-				std::copy(&values[source_pos], &values[source_pos + batch_count], a.begin());
-				const auto new_leaf_node = make_leaf_node(a);
+				std::copy(&values[source_pos],
+					&values[source_pos + batch_count],
+					new_leaf_node.get_leaf_node()->_values.begin());
+
 				result = push_back_leaf_node(result, new_leaf_node, batch_count);
 
 				source_pos += batch_count;
@@ -1068,8 +1104,8 @@ bool vector<T>::operator==(const vector& rhs) const{
 		return true;
 	}
 	else{
-		//	### optimize by comparing leaf node by leaf node.
-		//	First check leaf-node to see if they are the same pointer. If not, compary their values.
+		//	### optimize by comparing node by node.
+		//	First check node to see if they are the same pointer. If not, compary their values.
 		const auto a = to_vec();
 		const auto b = rhs.to_vec();
 		return a == b;
