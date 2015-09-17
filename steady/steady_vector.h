@@ -210,8 +210,7 @@ class vector {
 
 		Worst case is O(n) but performance is better when sharing is detected between vectors.
 		Best case: O(1)
-
-		### Warning: current implementation copies memory, allocates memory and can throw exceptions.
+		No memory allocation.
 
 		return: true if vectors have the same size and operator==() on every value are true
 	*/
@@ -259,6 +258,16 @@ class vector {
 	public: vector(internals::node_ref<T> root, std::size_t size, int shift);
 
 	public: int get_shift() const;
+
+
+	//	Efficient way to access values. Multiple of BRANCHING_FACTOR.
+	public: size_t get_block_count() const;
+
+	/*
+		Last block may be partial if vector isn't multiple of block size.
+		You can only call this function when get_block_count() returns > 0.
+	*/
+	public: const T* get_block(size_t block_index) const;
 
 
 	///////////////////////////////////////		State

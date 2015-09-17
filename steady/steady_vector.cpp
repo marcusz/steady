@@ -495,7 +495,7 @@ using namespace internals;
 
 namespace {
 
-	size_t round_up(size_t value, size_t align){
+	size_t divide_round_up(size_t value, size_t align){
 		auto r = value / align;
 		return r * align < value ? r + 1 : r;
 	}
@@ -509,7 +509,7 @@ namespace {
 		3: two levels of inodes plus leaf nodes.
 	*/
 	int count_to_depth(size_t count){
-		const auto leaf_count = round_up(count, BRANCHING_FACTOR);
+		const auto leaf_count = divide_round_up(count, BRANCHING_FACTOR);
 
 		if(leaf_count == 0){
 			return 0;
@@ -614,7 +614,7 @@ namespace {
 
 	/*
 		Verifies the tree is valid.
-		??? improve
+		### improve
 	*/
 	template <class T>
 	bool tree_check_invariant(const node_ref<T>& tree, size_t size){
@@ -1071,6 +1071,27 @@ int vector<T>::get_shift() const{
 }
 
 
+
+template <class T>
+size_t vector<T>::get_block_count() const{
+	ASSERT(check_invariant());
+
+	size_t count = divide_round_up(_size, BRANCHING_FACTOR);
+	return count;
+}
+
+template <class T>
+const T* vector<T>::get_block(size_t block_index) const{
+	ASSERT(check_invariant());
+	ASSERT(get_block_count() > 0);
+	ASSERT(block_index < get_block_count());
+
+	const auto leaf = find_leaf_node(*this, block_index * BRANCHING_FACTOR);
+	return &leaf.get_leaf_node()->_values[0];
+}
+
+
+
 template <class T>
 vector<T> vector<T>::push_back(const T& value) const{
 	ASSERT(check_invariant());
@@ -1093,25 +1114,6 @@ vector<T> vector<T>::pop_back() const{
 }
 
 
-/*
-	### Correct but inefficient.
-*/
-template <class T>
-bool vector<T>::operator==(const vector& rhs) const{
-	ASSERT(check_invariant());
-
-	if(_size == rhs._size && _root._leaf == rhs._leaf && _root._inode == rhs._root._inode){
-		return true;
-	}
-	else{
-		//	### optimize by comparing node by node.
-		//	First check node to see if they are the same pointer. If not, compary their values.
-		const auto a = to_vec();
-		const auto b = rhs.to_vec();
-		return a == b;
-	}
-}
-
 
 
 template <class T>
@@ -1122,6 +1124,8 @@ vector<T> vector<T>::assoc(size_t index, const T& value) const{
 	const auto root = replace_value(_root, _shift, index, value);
 	return vector<T>(root, _size, _shift);
 }
+
+
 
 
 template <class T>
@@ -1770,24 +1774,24 @@ QUARK_UNIT_TEST("vector", "pop_back()", "basic", "correct result vector"){
 QUARK_UNIT_TEST("vector", "operator==()", "empty vs empty", "true"){
 	test_fixture<int> f;
 
-	const std::vector<int> a;
-	const std::vector<int> b;
+	const vector<int> a;
+	const vector<int> b;
 	VERIFY(a == b);
 }
 
 QUARK_UNIT_TEST("vector", "operator==()", "empty vs 1", "false"){
 	test_fixture<int> f;
 
-	const std::vector<int> a;
-	const std::vector<int> b{ 33 };
+	const vector<int> a;
+	const vector<int> b{ 33 };
 	VERIFY(!(a == b));
 }
 
 QUARK_UNIT_TEST("vector", "operator==()", "1000 vs 1000", "true"){
 	test_fixture<int> f;
 	const auto data = generate_numbers(4, 50, 50);
-	const std::vector<int> a(data);
-	const std::vector<int> b(data);
+	const vector<int> a(data);
+	const vector<int> b(data);
 	VERIFY(a == b);
 }
 
@@ -1797,8 +1801,8 @@ QUARK_UNIT_TEST("vector", "operator==()", "1000 vs 1000", "false"){
 	auto data2 = data;
 	data2[47] = 0;
 
-	const std::vector<int> a(data);
-	const std::vector<int> b(data2);
+	const vector<int> a(data);
+	const vector<int> b(data2);
 	VERIFY(!(a == b));
 }
 
@@ -1984,4 +1988,74 @@ QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 	VERIFY(c.to_vec() == (std::vector<int>{ 2, 3, 4, 5, 6, 7, 8 }));
 }
 
+
+
+
+
+
+
+
+/*
+	### Correct but inefficient.
+*/
+#if 0
+template <class T>
+bool vector<T>::operator==(const vector& rhs) const{
+	ASSERT(check_invariant());
+
+	const auto a = to_vec();
+	const auto b = rhs.to_vec();
+	return a == b;
+}
+
+#else
+
+template <class T>
+bool vector<T>::operator==(const vector& rhs) const{
+	ASSERT(check_invariant());
+
+	if(_size != rhs._size){
+		return false;
+	}
+	if(_size == 0){
+		return true;
+	}
+
+	if(_root.get_type() != rhs._root.get_type()){
+		return false;
+	}
+	if(_root.get_type() == node_type::inode && _root.get_inode() == rhs._root.get_inode()){
+		return true;
+	}
+	if(_root.get_type() == node_type::leaf_node && _root.get_leaf_node() == rhs._root.get_leaf_node()){
+		return true;
+	}
+
+	//	### optimize by comparing node by node, hiearchically.
+	//	First check node to see if they are the same pointer. If not, only then compare their values.
+
+	{
+		size_t block_count = get_block_count();
+		for(size_t index = 0 ; index < block_count ; index++){
+			const T* valuesA = get_block(index);
+			const T* valuesB = rhs.get_block(index);
+
+			size_t r = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
+			bool equal = std::equal(valuesA, valuesA + r, valuesB);
+			if(!equal){
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+#endif
+
 }	//	steady
+
+
+
+
+
