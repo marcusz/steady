@@ -15,8 +15,6 @@ NOW
 
 NEXT
 ====================================================================================================================
-[optimization] Store shift in vector to avoid recomputing it all the time.
-
 [defect] Exception safety pls!
 
 [defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
@@ -615,7 +613,7 @@ namespace {
 			result-tree and original tree shares internal state
 	*/
 	template <class T>
-	node_ref<T> modify_existing_value(const node_ref<T>& node, int shift, size_t index, const T& value){
+	node_ref<T> replace_value(const node_ref<T>& node, int shift, size_t index, const T& value){
 		ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
 
 		const size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
@@ -631,7 +629,7 @@ namespace {
 			ASSERT(node.get_type() == node_type::inode);
 
 			const auto child = node.get_inode()->get_child(slot_index);
-			auto child2 = modify_existing_value(child, shift - BRANCHING_FACTOR_SHIFT, index, value);
+			auto child2 = replace_value(child, shift - BRANCHING_FACTOR_SHIFT, index, value);
 
 			auto children = node.get_inode()->get_child_array();
 			children[slot_index] = child2;
@@ -705,9 +703,9 @@ namespace {
 		}
 		else{
 
-			//	Does last leaf node have space left? Then we can use modify_existing_value()...
+			//	Does last leaf node have space left? Then we can use replace_value()...
 			if((original_size & BRANCHING_FACTOR_MASK) != 0){
-				const auto root = modify_existing_value(original.get_root(), original_shift, original_size, value);
+				const auto root = replace_value(original.get_root(), original_shift, original_size, value);
 				return vector<T>(root, original_size + 1, original_shift);
 			}
 
@@ -777,14 +775,26 @@ namespace {
 	}
 
 
-#if false
+
 
 	/*
-		This is the central building block to add many values to a vector (or a create a new vector) fast.
+		This is the central building block: adds many values to a vector (or a create a new vector) fast.
 	*/
 	template <class T>
-	vector<T> push_back_batch(const vector<T>& original, const T values, size_t count){
+	vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
 		ASSERT(original.check_invariant());
+
+		vector<T> result = original;
+		for(size_t i = 0 ; i < count ; i++){
+			result = result.push_back(values[i]);
+		}
+		return result;
+	}
+#if false
+	template <class T>
+	vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
+		ASSERT(original.check_invariant());
+		ASSERT(values != nullptr);
 
 		vector<T> result = original;
 
@@ -797,7 +807,7 @@ namespace {
 			size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
 			size_t dest_pos = last_leaf_size;
 			while(dest_pos < BRANCHING_FACTOR && source_pos < count){
-			//	### Make a new replace_leaf_node() function and use it! Code is inside modify_existing_value().
+			//	### Make a new replace_leaf_node() function and use it! Code is inside replace_value().
 		//		node_ref<T> partial_leaf_node = find_leaf_node(const node_ref<T>& tree, size_t size, size_t index){
 
 				result = result.push_back(values[source_pos]);
@@ -824,10 +834,10 @@ namespace {
 		}
 		else{
 
-			//	Does last leaf node have space left? Then we can use modify_existing_value()...
+			//	Does last leaf node have space left? Then we can use replace_value()...
 			if((_size & BRANCHING_FACTOR_MASK) != 0){
 				auto shift = vector_size_to_shift(_size);
-				const auto root = modify_existing_value(_root, shift, _size, value);
+				const auto root = replace_value(_root, shift, _size, value);
 				return vector<T>(root, _size + 1);
 			}
 
@@ -880,10 +890,11 @@ template <class T>
 vector<T>::vector(const std::vector<T>& values){
 	//	!!! Illegal to take adress of first element of vec if it's empty.
 	if(!values.empty()){
-		vector<T> temp(&values[0], values.size());
+		auto temp = push_back_batch(vector<T>(), &values[0], values.size());
 		temp.swap(*this);
 	}
 
+	ASSERT(size() == values.size());
 	ASSERT(check_invariant());
 }
 
@@ -891,22 +902,20 @@ template <class T>
 vector<T>::vector(const T values[], size_t count){
 	ASSERT(values != nullptr);
 
-	vector<T> temp;
-	for(size_t i = 0 ; i < count ; i++){
-		temp = temp.push_back(values[i]);
-	}
+	auto temp = push_back_batch(vector<T>(), values, count);
 	temp.swap(*this);
 
+	ASSERT(size() == count);
 	ASSERT(check_invariant());
 }
 
 
 template <class T>
 vector<T>::vector(std::initializer_list<T> args){
-	std::vector<T> temp(args.begin(), args.end());
-	vector<T> temp2 = temp;
-	temp2.swap(*this);
+	auto temp = push_back_batch(vector<T>(), args.begin(), args.end() - args.begin());
+	temp.swap(*this);
 
+	ASSERT(size() == args.size());
 	ASSERT(check_invariant());
 }
 
@@ -915,7 +924,7 @@ template <class T>
 vector<T>::~vector(){
 	ASSERT(check_invariant());
 
-	_size = 0;
+	_size = -1;
 }
 
 
@@ -1045,7 +1054,7 @@ vector<T> vector<T>::assoc(size_t index, const T& value) const{
 	ASSERT(check_invariant());
 	ASSERT(index < _size);
 
-	const auto root = modify_existing_value(_root, _shift, index, value);
+	const auto root = replace_value(_root, _shift, index, value);
 	return vector<T>(root, _size, _shift);
 }
 
@@ -1071,6 +1080,7 @@ T vector<T>::operator[](const std::size_t index) const{
 	return result;
 }
 
+//	### Optimization potential here.
 template <class T>
 std::vector<T> vector<T>::to_vec() const{
 	ASSERT(check_invariant());
@@ -1134,10 +1144,20 @@ void vector<T>::trace_internals() const{
 //	### Optimization potential here.
 template <class T>
 vector<T> operator+(const vector<T>& a, const vector<T>& b){
-	vector<T> result = a;
+	vector<T> result;
+
+#if 1
+	if(b.empty()){
+	}
+	else{
+		const auto v = b.to_vec();
+		result = push_back_batch(a, &v[0], v.size());
+	}
+#else
 	for(size_t i = 0 ; i < b.size() ; i++){
 		result = result.push_back(b[i]);
 	}
+#endif
 
 	ASSERT(result.size() == a.size() + b.size());
 	return result;
