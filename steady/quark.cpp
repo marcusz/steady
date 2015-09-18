@@ -1,3 +1,21 @@
+/*
+	Copyright 2015 Marcus Zetterquist
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+
+	quark is a minimal library for super-gluing C++ code together
+	steady::vector<> is a persistent vector class for C++
+*/
 
 #include "quark.h"
 
@@ -12,15 +30,15 @@ namespace quark {
 
 
 //	Force compiler error if these flags has not been setup.
-bool assert_on = QUARK__ASSERT_ON;
-bool trace_on = QUARK__TRACE_ON;
-bool unit_tests_on = QUARK__UNIT_TESTS_ON;
+bool assert_on = QUARK_ASSERT_ON;
+bool trace_on = QUARK_TRACE_ON;
+bool unit_tests_on = QUARK_UNIT_TESTS_ON;
 
 
 
 
 
-#if QUARK__UNIT_TESTS_ON
+#if QUARK_UNIT_TESTS_ON
 	unit_test_registry* unit_test_rec::_registry_instance = nullptr;
 #endif
 
@@ -49,7 +67,7 @@ void set_runtime(runtime_i* iRuntime){
 
 
 
-#if QUARK__ASSERT_ON
+#if QUARK_ASSERT_ON
 
 //	!!!! SET A BREAK POINT HERE USING YOUR DEBUGGER TO INSPECT ANY ASSERTS
 
@@ -71,7 +89,7 @@ void on_assert_hook(runtime_i* runtime, const source_code_location& location, co
 
 
 
-#if QUARK__TRACE_ON
+#if QUARK_TRACE_ON
 
 void on_trace_hook(runtime_i* runtime, const char s[]){
 	assert(runtime != nullptr);
@@ -104,7 +122,7 @@ void on_trace_hook(runtime_i* runtime, const std::stringstream& s){
 
 
 
-#if QUARK__UNIT_TESTS_ON
+#if QUARK_UNIT_TESTS_ON
 
 //	!!!! SET A BREAK POINT HERE USING YOUR DEBUGGER TO INSPECT ANY ASSERTS
 

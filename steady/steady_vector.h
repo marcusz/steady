@@ -1,3 +1,125 @@
+/*
+	Copyright 2015 Marcus Zetterquist
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+
+	steady::vector<> is a persistent vector class for C++
+
+
+
+	STEADY::VECTOR<T>
+	====================================================================================================================
+
+	Persistent vector class, steady::vector<T>
+
+	The vector objects are immutable = can never be changed, but still have change-operations.
+
+	When you "modify" the vector you always get a copy of the vector with your changes integrated.
+	Internally, the new and old vectors shares most state so this is fast and uses little memory.
+
+	This gets you both the reliability of immutability with the ease of making modification the the vector.
+
+
+	COMPARISON TO C++ VECTOR (std::vector<>)
+	====================================================================================================================
+
+	PROs
+
+	1) More robust, easy-to-understand and side-effect free code since vectors never change.
+
+	2) Easier to implement pure function - functions that have no side-effects and still have good performance.
+		Pure functions are central to making reliable, testable and multithreaded code.
+
+	3) Since the vector never changes, it is safe to use it from many threads = thread safe.
+
+	4) Faster than std::vector<> when growing big vectors.
+
+
+	CONs
+
+	1) Slower reading and writing. (There are techniques - like batching - to avoid some of the overhead.
+
+	2) Allocates several memory blocks for bigger vectors where std::vector<> only has maximum of 1.
+
+	3) Not complete set of std C++ features, like iterators.
+
+	4) Not 100% swap-in replacement for std::vector<>.
+
+
+	Based on Clojure's persistent vector class. Does not yet use the tail-optimization.
+
+
+	NOTICE: if T has member functions that throws exception, so will vector.
+
+	NOTICE: Some member functions, like pop_back() and operator+(), have naive implementation that are slow right now.
+
+	Can hold 0 to UINT32_MAX values.
+
+	Strong exception-safety guarantee, just like C++ standad library and boost.
+
+
+	PLAN FORWARD
+	====================================================================================================================
+
+	NOW
+	--------------------------------------------------------------------------------------------------------------------
+	[communication] Improve GitHub tagging so you can finding it easily.
+
+	[communication] Improve GitHub readme with examples etc.
+
+
+	NEXT
+	--------------------------------------------------------------------------------------------------------------------
+	[communication] Rename library?
+
+	[optimization] optimize pop_back()
+
+	[defect] Exception safety pls!
+
+	[defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
+
+	[internal quality] Improve tree validation.
+
+	[internal quality] Test max-size of vector.
+
+	SOMEDAY
+	--------------------------------------------------------------------------------------------------------------------
+	[feature] first(),rest(). Add seq?
+
+	[optimization] optimize operator==() further, using recursion.
+
+	[optimization] Make inode use one pointer - not two - for each child.
+
+	[feature] Make memory allocation hookable.
+
+	[feature] Add subvec() - trimming and no trimming (= very fast).
+
+	[feature] Allow store() at end of vector => append
+
+	[optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
+
+	[optimization] Over-alloc / reserve nodes like std::vector<>?
+
+	[optimization] Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
+
+	[optimization] Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
+
+	[feature] Support different branch factors per instance of vector<T>? BF 2 is great for modification, bad for lookup.
+
+	[feature] Support holes = allow using for ideal hash.
+
+*/
+
 
 #ifndef __steady__vector__
 #define __steady__vector__
@@ -8,42 +130,14 @@
 #include <vector>
 #include <array>
 
-
-/*
-	Persistent vector class, steady::vector<T>
-
-	Vector object is immutable = can never be changed. This makes for robust code and thread safety etc.
-
-	When you modify the vector you always get a copy of the vector with your changes integrated.
-
-	Internally the new and old vectors shares most state so this is fast and uses little memory.
-
-
-	Based on Clojure's vector.
-
-	NOTICE: if T has member functions that throws exception, so will vector.
-
-
-	Some member functions have naive implementation that are very slow right now.
-*/
-
-/*
-			//	Give QUARK macros shorter names
-			#define ASSERT(x) QUARK_ASSERT(x)
-			#define TRACE(x) QUARK_TRACE(x)
-			#define TRACE_SS(x) QUARK_TRACE_SS(x)
-			#define VERIFY(x) QUARK_TEST_VERIFY(x)
-*/
+#define STEADY_ASSERT_ON QUARK_ASSERT_ON
 
 #define STEADY_ASSERT(x) QUARK_ASSERT(x)
+#define STEADY_ASSERT_UNREACHABLE QUARK_ASSERT_UNREACHABLE
 #define STEADY_TRACE(x) QUARK_TRACE(x)
 #define STEADY_TRACE_SS(x) QUARK_TRACE_SS(x)
 #define STEADY_TEST_VERIFY(x) QUARK_TEST_VERIFY(x)
-
 #define STEADY_SCOPED_TRACE(x) QUARK_SCOPED_TRACE(x)
-#define STEADY_ASSERT_UNREACHABLE QUARK_ASSERT_UNREACHABLE
-
-
 
 
 namespace steady {
@@ -52,7 +146,6 @@ namespace steady {
 	//	5 ( = 32 values per node) is ideal.
 	static const int BRANCHING_FACTOR_SHIFT = 5;
 	static const int BRANCHING_FACTOR = 1 << BRANCHING_FACTOR_SHIFT;
-
 
 
 	namespace internals {
@@ -141,16 +234,17 @@ namespace steady {
 				_debug_count--;
 			}
 
+		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const {
 				STEADY_ASSERT(_rc >= 0);
 				STEADY_ASSERT(_rc < 1000);
 				STEADY_ASSERT(_values.size() == BRANCHING_FACTOR);
 				return true;
 			}
+		#endif
 
 			private: leaf_node<T>& operator=(const leaf_node& rhs);
 			private: leaf_node(const leaf_node& rhs);
-
 
 
 			//////////////////////////////	State
@@ -192,7 +286,7 @@ namespace steady {
 			{
 				STEADY_ASSERT(children2.size() >= 0);
 				STEADY_ASSERT(children2.size() <= BRANCHING_FACTOR);
-		#if QUARK__ASSERT_ON
+		#if STEADY_ASSERT_ON
 				for(auto i: children2){
 					i.check_invariant();
 				}
@@ -213,6 +307,7 @@ namespace steady {
 			private: inode<T>& operator=(const inode& rhs);
 			private: inode(const inode& rhs);
 
+		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const {
 				STEADY_ASSERT(_rc >= 0);
 				STEADY_ASSERT(_rc < 10000);
@@ -220,7 +315,7 @@ namespace steady {
 
 				return true;
 			}
-
+		#endif
 			//	Counts the children actually used = skips trailing any null children.
 			public: size_t count_children() const{
 				STEADY_ASSERT(check_invariant());
@@ -283,7 +378,9 @@ namespace steady {
 
 			public: ~node_ref();
 
+		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const;
+		#endif
 			public: void swap(node_ref<T>& rhs);
 			public: node_ref<T>& operator=(const node_ref<T>& rhs);
 			
@@ -320,10 +417,10 @@ class vector {
 	public: vector();
 
 	/*
-		Makes vector containing values from a std::vector<>.
+		Makes a vector containing the values from a std::vector<>.
 		Allocates memory.
 
-		values: zero -> many values.
+		values: [0 -> many] values.
 		this: on exit this holds the new vector
 	*/
 	public: vector(const std::vector<T>& values);
@@ -355,6 +452,7 @@ class vector {
 	*/
 	public: ~vector();
 
+#if STEADY_ASSERT_ON
 	/*
 		Development feature: validates the internal state of the vector and calls ASSERT on defects.
 		use like:
@@ -364,6 +462,7 @@ class vector {
 		return: true = internal state is correct, false if not.
 	*/
 	public: bool check_invariant() const;
+#endif
 
 	/*
 		Copies a vector object.
@@ -643,7 +742,7 @@ vector<T> operator+(const vector<T>& a, const vector<T>& b);
 		template <class T>
 		bool tree_check_invariant(const node_ref<T>& tree, size_t size){
 			STEADY_ASSERT(tree.check_invariant());
-		#if QUARK__ASSERT_ON
+		#if STEADY_ASSERT_ON
 			if(size == 0){
 				STEADY_ASSERT(tree.get_type() == node_type::null_node);
 			}
@@ -1344,7 +1443,7 @@ vector<T> vector<T>::pop_back() const{
 
 
 /*
-	### Correct but inefficient.
+	Correct but inefficient.
 */
 #if 0
 template <class T>
@@ -1436,7 +1535,7 @@ T vector<T>::operator[](const std::size_t index) const{
 
 #if false
 
-//	### Optimization potential here.
+//	Correct but slow reference implementation.
 template <class T>
 std::vector<T> vector<T>::to_vec() const{
 	STEADY_ASSERT(check_invariant());

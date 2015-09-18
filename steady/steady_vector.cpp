@@ -1,60 +1,27 @@
+/*
+	Copyright 2015 Marcus Zetterquist
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+
+	steady::vector<> is a persistent vector class for C++
+*/
 
 #include "steady_vector.h"
 
 #include <algorithm>
 
-/*
 
-NOW
-====================================================================================================================
-[optimization] optimize pop_back()
-[feature] Name library
-
-Local control of precompiler:
-	STEADY_ASSERT()
-	STEADY_TRACE_ON etc
-
-
-NEXT
-====================================================================================================================
-[defect] Exception safety pls!
-
-[defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
-
-[internal quality] Improve tree validation.
-
-
-SOMEDAY
-====================================================================================================================
-[feature] first(),rest(). Add seq?
-
-[optimization] optimize operator==() further, using recursion.
-
-[optimization] Make inode use one pointer - not two - for each child.
-
-[feature] Make memory allocation hookable.
-
-[feature] Add subvec() - trimming and no trimming (= very fast).
-
-[feature] Allow store() at end of vector => append
-
-[optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
-
-[optimization] Over-alloc / reserve nodes like std::vector<>?
-
-[optimization] Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
-
-[optimization] Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
-
-[feature] Support different branch factors per instance of vector<T>? BF 2 is great for modification, bad for lookup.
-
-[feature] Support holes = allow using for ideal hash.
-
-*/
-
-
-
-//	Give QUARK macros shorter names
+//	Make shortcuts macros shorter names
 #define ASSERT(x) STEADY_ASSERT(x)
 #define TRACE(x) STEADY_TRACE(x)
 #define TRACE_SS(x) STEADY_TRACE_SS(x)
@@ -65,7 +32,6 @@ SOMEDAY
 
 
 namespace steady {
-
 
 namespace internals {
 
@@ -100,7 +66,6 @@ namespace internals {
 	}
 
 }
-
 
 
 
@@ -908,7 +873,7 @@ QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 ////////////////////////////////////////////		T = std::string
 
 
-#if 1
+
 QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 	using std::string;
 	test_fixture<string> f;
@@ -922,12 +887,6 @@ QUARK_UNIT_TEST("vector", "operator+()", "3 + 4 values", "7 values"){
 	assert(b == (steady::vector<string>{ "four", "five" }));
 	assert(c == (steady::vector<string>{ "one", "two", "three", "four", "five" }));
 }
-#endif
 
 
 }	//	steady
-
-
-
-
-
