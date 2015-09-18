@@ -21,12 +21,10 @@
 #include <iostream>
 
 
-/*
-	Make a vector of ints. Add a few numbers.
-	Notice that push_back() returns a new vector each time - you need to save the return value.
-	There are no side effects. This makes code very simple and solid.
-	It also makes it simple to design pure functions.
-*/
+//	Make a vector of ints. Add a few numbers.
+//	Notice that push_back() returns a new vector each time - you need to save the return value.
+//	There are no side effects. This makes code very simple and solid.
+//	It also makes it simple to design pure functions.
 void example1(){
 	steady::vector<int> a;
 	a.push_back(3);
@@ -47,10 +45,8 @@ void example1(){
 }
 
 
-/*
-	Demonstrate that "modifying" a vector leaves the original unchanged too.
-	Also: make the vector using initializer list (c++11)
-*/
+//	Demonstrate that "modifying" a vector leaves the original unchanged too.
+//	Also: make the vector using initializer list (c++11)
 void example2(){
 	const steady::vector<int> a{ 10, 20, 30 };
 	const auto b = a.push_back(40);
@@ -63,9 +59,7 @@ void example2(){
 }
 
 
-/*
-	Replace values in the vector. This also leaves original vector unchanged.
-*/
+//	Replace values in the vector. This also leaves original vector unchanged.
 void example3(){
 	const steady::vector<int> a{ 10, 20, 30 };
 	const auto b = a.store(0, 2010);
@@ -77,9 +71,7 @@ void example3(){
 }
 
 
-/*
-	Append two vectors.
-*/
+//	Append two vectors.
 void example4(){
 	const steady::vector<int> a{ 1, 2, 3 };
 	const steady::vector<int> b{ 4, 5 };
@@ -91,9 +83,7 @@ void example4(){
 }
 
 
-/*
-	Converting to and from std::vector<>.
-*/
+//	Converting to and from std::vector<>.
 void example5(){
 	const std::vector<int> a{ 1, 2, 3 };
 
@@ -109,9 +99,7 @@ void example5(){
 }
 
 
-/*
-	Try vectors of strings instead of ints.
-*/
+//	Try vectors of strings instead of ints.
 void example6(){
 	using std::string;
 
@@ -125,9 +113,7 @@ void example6(){
 }
 
 
-/*
-	Build huge vector by appending repeatedly.
-*/
+//	Build huge vector by appending repeatedly.
 void example7(){
 	const steady::vector<int> a{ 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
 	const auto b = a + a + a + a + a + a + a + a + a + a;

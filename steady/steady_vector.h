@@ -17,73 +17,6 @@
 
 
 
-	STEADY::VECTOR<T>
-	====================================================================================================================
-	This is a fast and reliable persistent vector class for C++. It is also thread safe.
-
-	"Persistent" means that all objects are immutable and modifications return new objects. Internal state is shared
-	between generations of vectors, using atomic reference counting. Since vectors never change, there is no need
-	for thread synchronization.
-
-
-	When you "modify" the vector you always get a copy of the vector with your changes integrated.
-	Internally, the new and old vectors shares most state so this is very fast and uses little memory.
-
-		//	Make a vector of ints. Add a few numbers.
-		//	Notice that push_back() returns a new vector each time - you need to save the return value.
-		//	There are no side effects. This makes code very simple and solid.
-		//	It also makes it simple to design pure functions.
-		void example1(){
-			steady::vector<int> a;
-			a.push_back(3);
-			a.push_back(8);
-			a.push_back(11);
-
-			//	Notice! a is still the empty vector! It has not changed!
-			assert(a.size() == 0);
-
-			//	Reuse variable b to keep the latest generation of the vector.
-			steady::vector<int> b;
-			b = b.push_back(3);
-			b = b.push_back(8);
-			b = b.push_back(11);
-
-			assert(b.size() == 3);
-			assert(b[2] == 11);
-		}
-
-
-	Apache License, Version 2.0
-	Based on Clojure's magical persistent vector class. Does not yet use the tail-optimization.
-	Strong exception-safety guarantee, just like C++ standad library and boost.
-
-
-	COMPARISON TO C++ VECTOR (std::vector<>)
-	====================================================================================================================
-
-	PROs
-
-	1) More robust, easy-to-understand and side-effect free code since vectors never change.
-
-	2) Easier to implement pure function - functions that have no side-effects and still have good performance.
-		Pure functions are central to making reliable, testable and multithreaded code.
-
-	3) Since the vector never changes, it is safe to use it from many threads = thread safe.
-
-	4) Faster than std::vector<> when growing big vectors.
-
-
-	CONs
-
-	1) Slower reading and writing. (There are techniques - like batching - to avoid some of the overhead.
-
-	2) Allocates several memory blocks for bigger vectors where std::vector<> only has maximum of 1.
-
-	3) Not complete set of std C++ features, like iterators.
-
-	4) Not 100% swap-in replacement for std::vector<>.
-
-
 	DETAILS
 	====================================================================================================================
 	NOTICE: if T has member functions that throws exception, so will vector.
@@ -120,6 +53,8 @@
 
 	SOMEDAY
 	--------------------------------------------------------------------------------------------------------------------
+	Replace block-functions in vector with an object that also maintains ownership of the vector. = safe.
+
 	[feature] first(),rest(). Add seq?
 
 	[optimization] optimize operator==() further, using recursion.
@@ -434,166 +369,40 @@ namespace steady {
 
 template <class T>
 class vector {
-
-	/*
-		Makes empty vector.
-		No memory allocation.
-		O(1)
-	*/
 	public: vector();
-
-	/*
-		Makes a vector containing the values from a std::vector<>.
-		Allocates memory.
-
-		values: [0 -> many] values.
-		this: on exit this holds the new vector
-	*/
 	public: vector(const std::vector<T>& values);
-
-	/*
-		Makes vector containing _count_ values from _values_.
-		Values are copied into the vector.
-		Allocates memory.
-
-		values: must not be nullptr, not even when count == 0
-		count: >= 0
-		this: on exit this holds the new vector
-	*/
 	public: vector(const T values[], size_t count);
-
-	/*
-		C++11 initializer-list constructor. Allows you to write
-			const vector<int>({ 1, 2, 3 });
-
-		Allocates memory.
-
-		args: a C++11 initializer list object that specifies the values for the new vector
-		this: on exit this holds the new vector
-	*/
 	public: vector(std::initializer_list<T> args);
-
-	/*
-		no-throw
-	*/
 	public: ~vector();
 
 #if STEADY_ASSERT_ON
-	/*
-		Development feature: validates the internal state of the vector and calls ASSERT on defects.
-		use like:
-			STEADY_ASSERT(myVector.check_invariant());
-
-		this: on exit, this will hold a copy of _rhs_
-		return: true = internal state is correct, false if not.
-	*/
 	public: bool check_invariant() const;
 #endif
 
-	/*
-		Copies a vector object.
-		Extremely fast since it shares the entire state with rhs, just updated the reference counter.
-		No memory allocation.
-		O(1)
-
-		this: on exit, this will hold a copy of _rhs_
-		rhs: vector to copy.
-	*/
 	public: vector(const vector& rhs);
-
-	/*
-		Same as copy-constructor.
-		Your existing variable holding the vector will be changd to hold vector rhs instead.
-		Notice: this function may appear to mutate the instance, but it doesn't.
-		No memory allocation.
-		O(1)
-
-		this: on entry this is the destination vector, on exit, it will hold _rhs_.
-		rhs: source vector
-	*/
 	public: vector& operator=(const vector& rhs);
-
-	/*
-		The variable holding your vector will be changed to hold the vector specified by _rhs_ and vice versa.
-		The vector objects are not mutated, they just switch place.
-		O(1)
-		No-throw guarantee.
-
-		this: on entry this holds vector A, on exit it holds vector B
-		rhs: on entry this holds vector B, on exit it holds vector A
-	*/
 	public: void swap(vector& rhs);
-
-	/*
-		Store value into the vector
-		Old vector will not be changed, instead a new vector with the store will be returned.
-		The new and old vector share most internal state.
-		O(1) ... almost
-
-		this: input vector
-		index: 0 -> (size - 1)
-		value: new value to store
-		return: new copy of the vector with _value_ stored at the _index_.
-	*/
 	public: vector store(size_t index, const T& value) const;
-
-	/*
-		Append value to the end of the vector, returning a vector with size + 1.
-		Old vector will not be changed, instead a new vector with the store will be returned.
-		The new and old vector share most internal state.
-		O(1) ... almost
-
-		value: value to append.
-		return: new copy of the vector, with _value_ tacked to the end. It will be 1 bigger than the input vector.
-	*/
 	public: vector push_back(const T& value) const;
-
-	/*
-		Remove last value in the vector, returning a vector with size - 1.
-
-		this: must have size() > 0
-		return: new copy of the vector, with the last values removed. It will be 1 smaller than input vector.
-	*/
 	public: vector pop_back() const;
 
-	/*
-		Returns true if vectors are equivalent.
-
-		Worst case is O(n) but performance is better when sharing is detected between vectors.
-		Best case: O(1)
-		No memory allocation.
-
-		return: true if vectors have the same size and operator==() on every value are true
-	*/
 	public: bool operator==(const vector& rhs) const;
 	public: bool operator!=(const vector& rhs) const{
 		return !(*this == rhs);
 	}
 
-	/*
-		How many values does the vector hold?
-
-		this: vector
-		return: the number of values in the vector. 0 ->
-	*/
 	public: std::size_t size() const;
 
 	public: bool empty() const{
 		return size() == 0;
 	}
 
-	/*
-		Get value at index
-		O(1) ... almost
-
-		this: input vector
-		index: 0 -> (size - 1)
-		return: value at index _index_.
-	*/
-	public: T operator[](const std::size_t index) const;
+	public: T operator[](std::size_t index) const;
 
 	public: std::vector<T> to_vec() const;
 
+	public: size_t get_block_count() const;
+	public: const T* get_block(size_t block_index) const;
 
 
 	///////////////////////////////////////		Internals
@@ -611,16 +420,6 @@ class vector {
 	public: int get_shift() const;
 
 
-	//	Efficient way to access values. Multiple of BRANCHING_FACTOR.
-	public: size_t get_block_count() const;
-
-	/*
-		Last block may be partial if vector isn't multiple of block size.
-		You can only call this function when get_block_count() returns > 0.
-	*/
-	public: const T* get_block(size_t block_index) const;
-
-
 	///////////////////////////////////////		State
 
 	private: internals::node_ref<T> _root;
@@ -635,9 +434,7 @@ class vector {
 
 ////////////////////////////////////////////		Global functions
 
-/*
-	Appends two vectors and returns a new one.
-*/
+
 template <class T>
 vector<T> operator+(const vector<T>& a, const vector<T>& b);
 

@@ -1,13 +1,11 @@
-# STEADY::VECTOR<T>
+# steady::vector<T>
 This is a fast and reliable persistent vector class for C++. It is also thread safe.
 
-"Persistent" means that all objects are immutable and modifications return new objects. Internal state is shared
-between generations of vectors, using atomic reference counting. Since vectors never change, there is no need
-for thread synchronization.
+"Persistent" means that all objects are immutable and when you "modify" the vector you get a copy of it with your changes integrated. Internally, the different generations of the vector object shares most state so this is very fast and uses little memory. This is done using atomic reference counting.
 
+Since vectors never change, there is no need for thread synchronization like mutexes!
 
-When you "modify" the vector you always get a copy of the vector with your changes integrated.
-Internally, the new and old vectors shares most state so this is very fast and uses little memory.
+Basic example:
 
 	//	Make a vector of ints. Add a few numbers.
 	//	Notice that push_back() returns a new vector each time - you need to save the return value.
@@ -32,31 +30,46 @@ Internally, the new and old vectors shares most state so this is very fast and u
 		assert(b[2] == 11);
 	}
 
+Writing to a vector:
 
-Apache License, Version 2.0
-Based on Clojure's magical persistent vector class. Does not yet use the tail-optimization.
-Strong exception-safety guarantee, just like C++ standad library and boost.
+	//	Replace values in the vector. This also leaves original vector unchanged.
+	void example3(){
+		const steady::vector<int> a{ 10, 20, 30 };
+		const auto b = a.store(0, 2010);
+		const auto c = b.store(2, 2030);
+
+		assert(a == (steady::vector<int>{ 10, 20, 30 }));
+		assert(b == (steady::vector<int>{ 2010, 20, 30 }));
+		assert(c == (steady::vector<int>{ 2010, 20, 2030 }));
+	}
 
 
-# COMPARISON TO C++ VECTOR (std::vector<>)
+- Apache License, Version 2.0
 
-PROs
+- Based on Clojure's magical persistent vector class and Phil Bagwells work. Does not yet use Clojure's tail-optimization.
 
-1) More robust, easy-to-understand and side-effect free code since vectors never change.
+- Strong exception-safety guarantee, just like C++ standad library and boost.
 
-2) Easier to implement pure function - functions that have no side-effects and still have good performance.
+
+# Comparison to C++ std::vector<>
+
+PRO:s
+
+1) More robust, easy-to-understand and side-effect free code since you *know* vectors never change.
+
+2) Since the vector never changes, it is safe to use it from many threads = thread safe.
+
+3) Easier to implement pure function - functions that have no side-effects - and still have good performance.
 	Pure functions are central to making reliable, testable and multithreaded code.
-
-3) Since the vector never changes, it is safe to use it from many threads = thread safe.
 
 4) Faster than std::vector<> when growing big vectors.
 
 
-CONs
+CON:s
 
-1) Slower reading and writing. (There are techniques - like batching - to avoid some of the overhead.
+1) Somewhat slower reading and writing. (There are techniques - like batching - to avoid some of this overhead.
 
-2) Allocates several memory blocks for bigger vectors where std::vector<> only has maximum of 1.
+2) Allocates several memory blocks for bigger vectors where std::vector<> only has one.
 
 3) Not complete set of std C++ features, like iterators.
 
