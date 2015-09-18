@@ -166,6 +166,42 @@ The new and old vector share most internal state.
 
 
 
+## vector push_back(const std::vector<T>& values) const
+Appends all values in _values_ to the vector. This is faster than adding one item at a time.
+
+- Allocates memory
+- Time complexity depends only on the size of _values_.
+- Throws exceptions
+
+**Arguments**
+
+- values: std::vector of values to append.
+- return: new copy of the vector, with _values_ tacked to the end. It will be 1 bigger than the input vector.
+
+
+template <class T>
+## vector push_back(const T values[], size_t count) const
+Appends the values values in _values_ to the vector. This is faster than adding one item at a time.
+
+- Allocates memory
+- Time complexity depends only on the size specified by _count_.
+- Throws exceptions
+
+**Arguments**
+
+- values: pointer to a number of values to append.
+- count: [0 <= count < UMAX32_t] number of values to copy from _values_.
+- return: new copy of the vector, with _values_ tacked to the end. It will be 1 bigger than the input vector.
+
+
+
+
+
+
+
+
+
+
 ## vector pop_back() const
 Remove last value in the vector, returning a vector with size - 1.
 
@@ -293,6 +329,7 @@ Appends two vectors and returns a new one.
 - a: input vector a
 - b: input vector b
 - return: new vector with values from a followed by values from b.
+
 
 
 

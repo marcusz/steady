@@ -37,8 +37,9 @@
 
 	NEXT
 	--------------------------------------------------------------------------------------------------------------------
-	[optimization] Add batch_push_back()
 	[communication] Rename library?
+
+	[optimization] Add batch-reading()
 
 	[optimization] optimize pop_back()
 
