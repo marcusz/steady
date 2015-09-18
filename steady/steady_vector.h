@@ -34,22 +34,23 @@
 	--------------------------------------------------------------------------------------------------------------------
 	[communication] Improve GitHub tagging so you can finding it easily.
 
-	[communication] Improve GitHub readme with examples etc.
-
 
 	NEXT
 	--------------------------------------------------------------------------------------------------------------------
+	[optimization] Add batch_push_back()
 	[communication] Rename library?
 
 	[optimization] optimize pop_back()
 
-	[defect] Exception safety pls!
+	[defect] Verify exception safety pls!
 
 	[defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
 
 	[internal quality] Improve tree validation.
 
 	[internal quality] Test max-size of vector.
+
+	[feature] Add subvec() - trimming and no trimming (= very fast).
 
 	SOMEDAY
 	--------------------------------------------------------------------------------------------------------------------
@@ -63,7 +64,6 @@
 
 	[feature] Make memory allocation hookable.
 
-	[feature] Add subvec() - trimming and no trimming (= very fast).
 
 	[feature] Allow store() at end of vector => append
 
@@ -200,14 +200,12 @@ namespace steady {
 				_debug_count--;
 			}
 
-		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const {
 				STEADY_ASSERT(_rc >= 0);
 				STEADY_ASSERT(_rc < 1000);
 				STEADY_ASSERT(_values.size() == BRANCHING_FACTOR);
 				return true;
 			}
-		#endif
 
 			private: leaf_node<T>& operator=(const leaf_node& rhs);
 			private: leaf_node(const leaf_node& rhs);
@@ -273,7 +271,6 @@ namespace steady {
 			private: inode<T>& operator=(const inode& rhs);
 			private: inode(const inode& rhs);
 
-		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const {
 				STEADY_ASSERT(_rc >= 0);
 				STEADY_ASSERT(_rc < 10000);
@@ -281,7 +278,7 @@ namespace steady {
 
 				return true;
 			}
-		#endif
+
 			//	Counts the children actually used = skips trailing any null children.
 			public: size_t count_children() const{
 				STEADY_ASSERT(check_invariant());
@@ -344,9 +341,8 @@ namespace steady {
 
 			public: ~node_ref();
 
-		#if STEADY_ASSERT_ON
 			public: bool check_invariant() const;
-		#endif
+
 			public: void swap(node_ref<T>& rhs);
 			public: node_ref<T>& operator=(const node_ref<T>& rhs);
 			
@@ -380,15 +376,16 @@ class vector {
 	public: vector(std::initializer_list<T> args);
 	public: ~vector();
 
-#if STEADY_ASSERT_ON
 	public: bool check_invariant() const;
-#endif
 
 	public: vector(const vector& rhs);
 	public: vector& operator=(const vector& rhs);
 	public: void swap(vector& rhs);
 	public: vector store(size_t index, const T& value) const;
 	public: vector push_back(const T& value) const;
+	public: vector<T> push_back(const std::vector<T>& values) const;
+	public: vector<T> push_back(const T values[], size_t count) const;
+
 	public: vector pop_back() const;
 
 	public: bool operator==(const vector& rhs) const;
@@ -444,7 +441,9 @@ template <class T>
 vector<T> operator+(const vector<T>& a, const vector<T>& b);
 
 
-
+//	For diagnosics and demo purposes.
+template <class T> size_t get_inode_count();
+template <class T> size_t get_leaf_count();
 
 
 
@@ -1256,6 +1255,27 @@ vector<T> vector<T>::push_back(const T& value) const{
 }
 
 
+template <class T>
+vector<T> vector<T>::push_back(const std::vector<T>& values) const{
+	STEADY_ASSERT(check_invariant());
+
+	if(values.size() > 0){
+		return internals::push_back_batch(*this, &values[0], values.size());
+	}
+	else{
+		return *this;
+	}
+}
+
+template <class T>
+vector<T> vector<T>::push_back(const T values[], size_t count) const{
+	STEADY_ASSERT(check_invariant());
+	STEADY_ASSERT(values != nullptr);
+
+	return internals::push_back_batch(*this, values, count);
+}
+
+
 /*
 	### Correct but inefficient.
 */
@@ -1435,6 +1455,17 @@ vector<T> operator+(const vector<T>& a, const vector<T>& b){
 	STEADY_ASSERT(result.size() == a.size() + b.size());
 	return result;
 }
+
+
+template <class T> size_t get_inode_count(){
+	return internals::inode<T>::_debug_count;
+}
+
+template <class T> size_t get_leaf_count(){
+	return internals::leaf_node<T>::_debug_count;
+}
+
+
 
 
 }	//	steady

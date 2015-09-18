@@ -19,6 +19,10 @@
 #include "steady_vector.h"
 
 #include <iostream>
+#include <thread>
+#include <future>
+#include <cmath>
+#include <algorithm>
 
 
 //	Make a vector of ints. Add a few numbers.
@@ -131,6 +135,151 @@ void example7(){
 
 
 
+/////////////////		Multi-threading example
+
+
+
+struct pixel {
+	pixel(float red, float green, float blue, float alpha) :
+		_red(red),
+		_green(green),
+		_blue(blue),
+		_alpha(alpha)
+	{
+	}
+	pixel() = default;
+	pixel& operator=(const pixel& rhs) = default;
+	pixel(const pixel& rhs) = default;
+
+
+	////////////////	State
+
+	float _red = 0.0f;
+	float _green = 0.0f;
+	float _blue = 0.0f;
+	float _alpha = 0.0f;
+};
+
+struct image {
+	int _width;
+	int _height;
+	steady::vector<pixel> _pixels;
+};
+
+image make_image(int width, int height){
+	steady::vector<pixel> pixels;
+
+	std::vector<pixel> line;
+	line.reserve(width);
+	for(auto y = 0 ; y < height ; y++){
+		line.clear();
+		for(auto x = 0 ; x < width ; x++){
+			float s = std::sin(M_PI * 2.0f * (float)x);
+			pixel p(0.5f + s, 0.5f, 0.0f, 1.0f);
+			line.push_back(p);
+		}
+		pixels = pixels.push_back(line);
+	}
+
+	image result;
+	result._width = width;
+	result._height = height;
+	result._pixels = pixels;
+	return result;
+}
+
+
+//	There is no way to trip-up caller because image is a copy.
+image worker8(image img) {
+	const size_t count = std::min<size_t>(300, img._pixels.size());
+	for(int i = 0 ; i < count ; i++){
+		auto pixel = img._pixels[i];
+		pixel._red = 1.0f - pixel._red;
+		img._pixels = img._pixels.store(i, pixel);
+	}
+	return img;
+}
+
+//	Demonstates it is safe and easy and efficent to use steady::vector when sharing data between threads.
+void example8(){
+	QUARK_SCOPED_TRACE(__FUNCTION__);
+
+	//	Make a big image.
+	const auto a = make_image(1000, 1000);
+
+	//	How many nodes are allocated now?
+	const auto inodes1 = steady::get_inode_count<pixel>();
+	const auto leaf_nodes1 = steady::get_leaf_count<pixel>();
+	QUARK_TRACE_SS("When a exists: inodes: " << inodes1 << ", leaf nodes: " << leaf_nodes1);
+
+	//	Get a workerthread process image a in the background.
+	//	We give the worker a copy of a. This is free.
+	//	There is no way for worker thread to have side effects on image a.
+	auto future = std::async(worker8, a);
+
+	//	...meanwhile, do some processing of our own on mage a!
+	auto b = a;
+	for(int i = 0 ; i < 1000 ; i++){
+		auto pixel = b._pixels[i];
+		pixel._red = 1.0f - pixel._red;
+		b._pixels = b._pixels.store(i, pixel);
+	}
+
+	//	Block on worker finishing.
+	image c = future.get();
+
+
+	/*
+		RESULT
+
+		We now have 3 images: a, b, c. They are mostly identical.
+		The modified images share most of their state = very litte memory is consumed.
+		Copying the images was free.
+		There was no way to get data races on the images.
+		No need for locks.
+		No need to duplicate data to avoid races.
+	*/
+
+	const auto inodes2 = steady::get_inode_count<pixel>();
+	const auto leaf_nodes2 = steady::get_leaf_count<pixel>();
+	QUARK_TRACE_SS("When b + c exists: inodes: " << inodes2 << ", leaf nodes: " << leaf_nodes2);
+
+	const auto extra_inodes = inodes2 - inodes1;
+	const auto extra_leaf_nodes = leaf_nodes2 - leaf_nodes1;
+
+	QUARK_TRACE_SS("Extra storage requried for a + b: inodes: " << extra_inodes << ", leaf nodes: " << extra_leaf_nodes);
+}
+
+
+
+
+
+
+
+
+
+void worker9(int tid) {
+	std::cout << "Launched by thread " << tid << std::endl;
+}
+
+//	Do some threading.
+void example9(){
+	const int num_threads = 10;
+	std::vector<std::thread> threads;
+
+	for (int i = 0; i < num_threads; ++i) {
+		threads.push_back(std::thread(worker9, i));
+	}
+
+	std::cout << "Launched from the main\n";
+
+	for (std::thread& t: threads) {
+		t.join();
+	}
+}
+
+
+
 void examples(){
 	example1();
 	example2();
@@ -139,15 +288,15 @@ void examples(){
 	example5();
 	example6();
 	example7();
+	example8();
+//	example9();
 }
 
 int main(int argc, const char * argv[]){
-#if QUARK_UNIT_TESTS_ON
-	quark::run_tests();
-#endif
-
 	try {
-		QUARK_TRACE("Hello, World 3!");
+#if QUARK_UNIT_TESTS_ON
+		quark::run_tests();
+#endif
 		examples();
 	}
 	catch(...){
