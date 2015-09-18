@@ -19,15 +19,43 @@
 
 	STEADY::VECTOR<T>
 	====================================================================================================================
+	This is a fast and reliable persistent vector class for C++. It is also thread safe.
 
-	Persistent vector class, steady::vector<T>
+	"Persistent" means that all objects are immutable and modifications return new objects. Internal state is shared
+	between generations of vectors, using atomic reference counting. Since vectors never change, there is no need
+	for thread synchronization.
 
-	The vector objects are immutable = can never be changed, but still have change-operations.
 
 	When you "modify" the vector you always get a copy of the vector with your changes integrated.
-	Internally, the new and old vectors shares most state so this is fast and uses little memory.
+	Internally, the new and old vectors shares most state so this is very fast and uses little memory.
 
-	This gets you both the reliability of immutability with the ease of making modification the the vector.
+		//	Make a vector of ints. Add a few numbers.
+		//	Notice that push_back() returns a new vector each time - you need to save the return value.
+		//	There are no side effects. This makes code very simple and solid.
+		//	It also makes it simple to design pure functions.
+		void example1(){
+			steady::vector<int> a;
+			a.push_back(3);
+			a.push_back(8);
+			a.push_back(11);
+
+			//	Notice! a is still the empty vector! It has not changed!
+			assert(a.size() == 0);
+
+			//	Reuse variable b to keep the latest generation of the vector.
+			steady::vector<int> b;
+			b = b.push_back(3);
+			b = b.push_back(8);
+			b = b.push_back(11);
+
+			assert(b.size() == 3);
+			assert(b[2] == 11);
+		}
+
+
+	Apache License, Version 2.0
+	Based on Clojure's magical persistent vector class. Does not yet use the tail-optimization.
+	Strong exception-safety guarantee, just like C++ standad library and boost.
 
 
 	COMPARISON TO C++ VECTOR (std::vector<>)
@@ -56,16 +84,14 @@
 	4) Not 100% swap-in replacement for std::vector<>.
 
 
-	Based on Clojure's persistent vector class. Does not yet use the tail-optimization.
-
-
+	DETAILS
+	====================================================================================================================
 	NOTICE: if T has member functions that throws exception, so will vector.
 
 	NOTICE: Some member functions, like pop_back() and operator+(), have naive implementation that are slow right now.
 
 	Can hold 0 to UINT32_MAX values.
 
-	Strong exception-safety guarantee, just like C++ standad library and boost.
 
 
 	PLAN FORWARD
