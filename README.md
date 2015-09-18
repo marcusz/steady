@@ -1,7 +1,7 @@
 # steady::vector<T>
-This is a fast and reliable persistent vector class for C++. It is also thread safe.
+This is a fast and reliable persistent (immutable) vector class for C++. It is safe to use in threaded program.
 
-"Persistent" means that all objects are immutable and when you "modify" the vector you get a copy of it with your changes integrated. Internally, the different generations of the vector object shares most state so this is very fast and uses little memory. This is done using atomic reference counting.
+"Persistent" means that all vectors are immutable and when you "modify" the vector you get a copy of it with your changes integrated. Internally, the different generations of the vector object shares most state so this is very fast and uses little memory. This is done using atomic reference counting.
 
 Since vectors never change, there is no need for thread synchronization like mutexes!
 
@@ -48,7 +48,9 @@ Writing to a vector:
 
 - Based on Clojure's magical persistent vector class and Phil Bagwells work. Does not yet use Clojure's tail-optimization.
 
-- Strong exception-safety guarantee, just like C++ standad library and boost.
+- Strong exception-safety guarantee, just like C++ standard library and boost.
+
+- Robust and heavily unit-tested implementation.
 
 
 # Comparison to C++ std::vector<>
@@ -67,10 +69,8 @@ PRO:s
 
 CON:s
 
-1) Somewhat slower reading and writing. (There are techniques - like batching - to avoid some of this overhead.
+1) Somewhat slower reading and writing. (There are techniques - like batching - to avoid some of this overhead.)
 
-2) Allocates several memory blocks for bigger vectors where std::vector<> only has one.
+2) Not complete set of std C++ features, like iterators.
 
-3) Not complete set of std C++ features, like iterators.
-
-4) Not 100% swap-in replacement for std::vector<>.
+3) Not a 100% drop-in replacement for std::vector<>.
