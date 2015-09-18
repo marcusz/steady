@@ -635,6 +635,32 @@ QUARK_UNIT_TEST("vector", "push_back()", "3-levels of inodes + add leaf-node to 
 }
 
 
+////////////////////////////////////////////		vector::push_back(const std::vector<T>& values)
+
+
+QUARK_UNIT_TEST("vector", "push_back()", "1-level of inodes + add leaf-node to last node", "read back all values"){
+	test_fixture<int> f;
+	const auto count = BRANCHING_FACTOR + 2;
+	const auto data = generate_numbers(4, count, count);
+	vector<int> a;
+	a = a.push_back(data);
+	VERIFY(a.to_vec() == data);
+}
+
+
+////////////////////////////////////////////		vector::push_back(const T values[], size_t count)
+
+
+QUARK_UNIT_TEST("vector", "push_back()", "1-level of inodes + add leaf-node to last node", "read back all values"){
+	test_fixture<int> f;
+	const auto count = BRANCHING_FACTOR + 2;
+	const auto data = generate_numbers(4, count, count);
+	vector<int> a;
+	a = a.push_back(&data[0], count);
+	VERIFY(a.to_vec() == data);
+}
+
+
 ////////////////////////////////////////////		vector::pop_back()
 
 

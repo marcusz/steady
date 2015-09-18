@@ -189,7 +189,7 @@ Appends the values values in _values_ to the vector. This is faster than adding 
 
 **Arguments**
 
-- values: pointer to a number of values to append.
+- values: pointer to a number of values to append. Cannot be nullptr, even when count == 0.
 - count: [0 <= count < UMAX32_t] number of values to copy from _values_.
 - return: new copy of the vector, with _values_ tacked to the end. It will be 1 bigger than the input vector.
 

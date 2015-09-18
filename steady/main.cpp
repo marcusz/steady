@@ -205,7 +205,7 @@ void example8(){
 	QUARK_SCOPED_TRACE(__FUNCTION__);
 
 	//	Make a big image.
-	const auto a = make_image(1000, 1000);
+	const auto a = make_image(700, 700);
 
 	//	How many nodes are allocated now?
 	const auto inodes1 = steady::get_inode_count<pixel>();
@@ -219,7 +219,7 @@ void example8(){
 
 	//	...meanwhile, do some processing of our own on mage a!
 	auto b = a;
-	for(int i = 0 ; i < 1000 ; i++){
+	for(int i = 0 ; i < 200 ; i++){
 		auto pixel = b._pixels[i];
 		pixel._red = 1.0f - pixel._red;
 		b._pixels = b._pixels.store(i, pixel);
