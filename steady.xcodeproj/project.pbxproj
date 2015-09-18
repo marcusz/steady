@@ -11,8 +11,6 @@
 		2C3C911618342B5A00768EC2 /* steady.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2C3C911518342B5A00768EC2 /* steady.1 */; };
 		2C3C911E18342B8200768EC2 /* steady_vector.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2C3C911C18342B8200768EC2 /* steady_vector.cpp */; };
 		2C44D746184013DA006DCB22 /* quark.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2C44D745184013DA006DCB22 /* quark.cpp */; };
-		2CF7C5F41BAC062B00E3BC00 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 2CF7C5F31BAC062B00E3BC00 /* README.md */; settings = {ASSET_TAGS = (); }; };
-		2CF7C5F81BAC0DE300E3BC00 /* steady_vector.md in Sources */ = {isa = PBXBuildFile; fileRef = 2CF7C5F71BAC0DE300E3BC00 /* steady_vector.md */; settings = {ASSET_TAGS = (); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -137,10 +135,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CF7C5F81BAC0DE300E3BC00 /* steady_vector.md in Sources */,
 				2C44D746184013DA006DCB22 /* quark.cpp in Sources */,
 				2C3C911E18342B8200768EC2 /* steady_vector.cpp in Sources */,
-				2CF7C5F41BAC062B00E3BC00 /* README.md in Sources */,
 				2C3C911418342B5A00768EC2 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

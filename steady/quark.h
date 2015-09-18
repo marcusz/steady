@@ -21,13 +21,15 @@
 	QUARK - THE C++ SUPER GLUE
 	====================================================================================================================
 
-	It's problematic in C++ to build code separately then compose them together to bigger software.
-	Some common low-level infrastructure is missing.
-	Often the low-level libraries must not make assumptions on how defects are tracked, how you add tests etc.
-	Things like rracing, asserts, unit tests.
+	It's problematic in C++ to build code separately then compose them together into bigger programs and libraries.
+	Some common low-level infrastructure is missing so the library-maker must make assumptions or decisions that
+	really the *user* of the library should control.
 
-	Quark attempts to be very small and explicit and to be the only "library" you need in each of your components to
-	allow you to compose lots of libraries together.
+	How are defects are detected, how do you add and run tests etc?
+
+
+	Quark attempts to be the only "library" you need to use in each of your library, then help you compose libraries
+	together neatly. Like super glue :-)
 
 	Quark is designed to be a policy rather than actual code. These are the primitives that makes up that policy:
 
@@ -41,16 +43,18 @@
 		QUARK_UNIT_TEST
 		QUARK_TEST_VERIFY(x)
 
+	Using quark.h and quark.cpp is very convenient but optional.
+
 
 	CONFIGURATION
 	====================================================================================================================
-	Configure by settings these flags in your compiler settings:
+	Configure quark.h / quark.cpp by settings these flags in your compiler settings:
 
 		#define QUARK_ASSERT_ON true
 		#define QUARK_TRACE_ON true
 		#define QUARK_UNIT_TESTS_ON true
 
-	They are independent of eachother and any combination is valid!
+	They are independent of each other and any combination is valid! If you don't set them, they default to the above.
 
 	See "EVEN MORE INDEPENDENCE" for more advanced possibilities.
 
