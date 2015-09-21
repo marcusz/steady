@@ -5,6 +5,8 @@ This is a fast and reliable persistent (immutable) vector class for C++. You can
 
 Since vectors never change, there is no need for thread synchronization like mutexes!
 
+Documentation: https://github.com/marcusz/steady/blob/master/steady/steady_vector.md
+
 Basic example:
 
 	//	Make a vector of ints. Add a few numbers.
