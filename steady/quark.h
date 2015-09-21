@@ -376,33 +376,42 @@ void set_runtime(runtime_i* iRuntime);
 	Part of internal mechanism to get stack / scoped-based RAII working for indented tracing.
 */
 
-#if QUARK_TRACE_ON
-
 	struct scoped_trace {
 		scoped_trace(const char s[]){
+#if QUARK_TRACE_ON
 			runtime_i* r = get_runtime();
 			r->runtime_i__trace(s);
 			r->runtime_i__trace("{");
 			r->runtime_i__add_log_indent(1);
+#endif
 		}
 
 		scoped_trace(const std::string& s){
+#if QUARK_TRACE_ON
 			runtime_i* r = get_runtime();
 			r->runtime_i__trace(s.c_str());
 			r->runtime_i__trace("{");
 			r->runtime_i__add_log_indent(1);
+#endif
 		}
 
 		~scoped_trace(){
+#if QUARK_TRACE_ON
 			runtime_i* r = get_runtime();
 			r->runtime_i__add_log_indent(-1);
 			if(_trace_brackets){
 				r->runtime_i__trace("}");
 			}
+#endif
 		}
 
+#if QUARK_TRACE_ON
 		private: bool _trace_brackets = true;
+#endif
 	};
+
+
+#if QUARK_TRACE_ON
 
 	////////////////////////////		Hook functions.
 	/*

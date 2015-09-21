@@ -1,5 +1,5 @@
 # steady::vector<T>
-This is a fast and reliable persistent (immutable) vector class for C++. It is safe to use in threaded program.
+This is a fast and reliable persistent (immutable) vector class for C++. You can safely share these vectors between threads in multi-threaded programs.
 
 "Persistent" means that all vectors are immutable and when you "modify" the vector you get a copy of it with your changes integrated. Internally, the different generations of the vector object shares most state so this is very fast and uses little memory. This is done using atomic reference counting.
 

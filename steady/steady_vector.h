@@ -298,7 +298,7 @@ namespace steady {
 				return _children;
 			}
 
-			public: node_ref<T> get_child(size_t index) const{
+			public: const node_ref<T>& get_child(size_t index) const{
 				STEADY_ASSERT(check_invariant());
 				STEADY_ASSERT(index < BRANCHING_FACTOR);
 				STEADY_ASSERT(index < _children.size());
@@ -319,7 +319,7 @@ namespace steady {
 			//////////////////////////////	State
 
 			public: std::atomic<int32_t> _rc;
-			private: children_t _children;
+			public: children_t _children;
 			public: static int _debug_count;
 		};
 
@@ -348,13 +348,13 @@ namespace steady {
 			public: node_ref<T>& operator=(const node_ref<T>& rhs);
 			
 			public: node_type get_type() const;
-			public: const inode<T>* get_inode() const;
-			public: const leaf_node<T>* get_leaf_node() const;
-			public: leaf_node<T>* get_leaf_node();
+			public: inline const inode<T>* get_inode() const;
+			public: inline const leaf_node<T>* get_leaf_node() const;
+			public: inline leaf_node<T>* get_leaf_node();
 
 			///////////////////////////////////////		State
 
-			private: inode<T>* _inode;
+			public: inode<T>* _inode;
 			public: leaf_node<T>* _leaf_node;
 		};
 
@@ -384,8 +384,8 @@ class vector {
 	public: void swap(vector& rhs);
 	public: vector store(size_t index, const T& value) const;
 	public: vector push_back(const T& value) const;
-	public: vector<T> push_back(const std::vector<T>& values) const;
-	public: vector<T> push_back(const T values[], size_t count) const;
+	public: vector push_back(const std::vector<T>& values) const;
+	public: vector push_back(const T values[], size_t count) const;
 
 	public: vector pop_back() const;
 
@@ -1368,6 +1368,9 @@ std::size_t vector<T>::size() const{
 }
 
 
+#if false
+
+//	Correct, reference implementation.
 template <class T>
 T vector<T>::operator[](const std::size_t index) const{
 	STEADY_ASSERT(check_invariant());
@@ -1380,6 +1383,39 @@ T vector<T>::operator[](const std::size_t index) const{
 	const T result = leaf.get_leaf_node()->_values[slot_index];
 	return result;
 }
+
+#else
+
+/*
+Speed-optimized implementation of operator[].
+Avoids updating reference counters, avoids function calls etc.
+*/
+template <class T>
+T vector<T>::operator[](const std::size_t index) const{
+	STEADY_ASSERT(check_invariant());
+	STEADY_ASSERT(index < _size);
+
+	auto shift = _shift;
+	const internals::node_ref<T>* node_it = &_root;
+
+	//	Traverse all inodes.
+	while(shift > 0){
+		size_t slot_index = (index >> shift) & internals::BRANCHING_FACTOR_MASK;
+		node_it = &node_it->_inode->_children[slot_index];
+		shift -= BRANCHING_FACTOR_SHIFT;
+	}
+
+	STEADY_ASSERT(shift == internals::LEAF_NODE_SHIFT);
+	STEADY_ASSERT(node_it->get_type() == internals::node_type::leaf_node);
+
+	const auto slot_index = index & internals::BRANCHING_FACTOR_MASK;
+
+	STEADY_ASSERT(slot_index < node_it->get_leaf_node()->_values.size());
+	const T* result = &node_it->_leaf_node->_values[slot_index];
+	return *result;
+}
+
+#endif
 
 
 #if false
