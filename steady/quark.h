@@ -258,15 +258,15 @@
 
 
 #ifndef QUARK_ASSERT_ON
-	#define QUARK_ASSERT_ON true
+	#define QUARK_ASSERT_ON 1
 #endif
 
 #ifndef QUARK_TRACE_ON
-	#define QUARK_TRACE_ON true
+	#define QUARK_TRACE_ON 1
 #endif
 
 #ifndef QUARK_UNIT_TESTS_ON
-	#define QUARK_UNIT_TESTS_ON true
+	#define QUARK_UNIT_TESTS_ON 1
 #endif
 
 

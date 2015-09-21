@@ -26,6 +26,18 @@ NEXT
 
 SOMEDAY
 --------------------------------------------------------------------------------------------------------------------
+Compile on other compilers. Cloud services?
+
+Use dev-branch
+
+Allow push_front() pop_front()
+
+Allow releasing unused leaf nodes at start of tree = support subvec and seq.
+
+Use slist to store tail = no need to copy 31 nodes for each append.
+
+Add peek_back()
+
 [optimization] Faster RC / atomics:
 	Register all threads in a vector. Now all RCs in vectors become
 	a vector of RC:s. The first is the main RC and uses atomics.
