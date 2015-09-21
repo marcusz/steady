@@ -24,62 +24,6 @@
 	NOTICE: Some member functions, like pop_back() and operator+(), have naive implementation that are slow right now.
 
 	Can hold 0 to UINT32_MAX values.
-
-
-
-	PLAN FORWARD
-	====================================================================================================================
-
-	NOW
-	--------------------------------------------------------------------------------------------------------------------
-	[communication] Improve GitHub tagging so you can finding it easily.
-
-
-	NEXT
-	--------------------------------------------------------------------------------------------------------------------
-	[communication] Rename library?
-
-	[optimization] Add batch-reading()
-
-	[optimization] optimize pop_back()
-
-	[defect] Verify exception safety pls!
-
-	[defect] Use placement-now in leaf nodes to avoid default-constructing all leaf node values.
-
-	[internal quality] Improve tree validation.
-
-	[internal quality] Test max-size of vector.
-
-	[feature] Add subvec() - trimming and no trimming (= very fast).
-
-	SOMEDAY
-	--------------------------------------------------------------------------------------------------------------------
-	Replace block-functions in vector with an object that also maintains ownership of the vector. = safe.
-
-	[feature] first(),rest(). Add seq?
-
-	[optimization] optimize operator==() further, using recursion.
-
-	[optimization] Make inode use one pointer - not two - for each child.
-
-	[feature] Make memory allocation hookable.
-
-
-	[feature] Allow store() at end of vector => append
-
-	[optimization] Pool nodes? Notice that inodes are the same size, independently of sizeof(T). This allows inod pooling across Ts.
-
-	[optimization] Over-alloc / reserve nodes like std::vector<>?
-
-	[optimization] Add tail-node optimization, or even random-access modification cache (one leaf-node that slides across vector, not just at the end).
-
-	[optimization] Removing values or nodes from a node doesn not need path-copying, only disposing entire nodes: we already store the count in
-
-	[feature] Support different branch factors per instance of vector<T>? BF 2 is great for modification, bad for lookup.
-
-	[feature] Support holes = allow using for ideal hash.
-
 */
 
 

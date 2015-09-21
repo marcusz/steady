@@ -33,6 +33,7 @@
 		2C3C911C18342B8200768EC2 /* steady_vector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = steady_vector.cpp; sourceTree = "<group>"; };
 		2C3C911D18342B8200768EC2 /* steady_vector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = steady_vector.h; sourceTree = "<group>"; };
 		2C44D745184013DA006DCB22 /* quark.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = quark.cpp; sourceTree = "<group>"; };
+		2CA9A7561BB02CFE006F454B /* todo.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = todo.txt; sourceTree = "<group>"; };
 		2CEAAE321836EBC0006A2953 /* quark.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = quark.h; sourceTree = "<group>"; };
 		2CF7C5F31BAC062B00E3BC00 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = SOURCE_ROOT; };
 		2CF7C5F51BAC0D4C00E3BC00 /* LICENSE.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
@@ -72,6 +73,7 @@
 		2C3C911218342B5A00768EC2 /* steady */ = {
 			isa = PBXGroup;
 			children = (
+				2CA9A7561BB02CFE006F454B /* todo.txt */,
 				2C3C911318342B5A00768EC2 /* main.cpp */,
 				2CF7C5F61BAC0DE300E3BC00 /* notes.txt */,
 				2C44D745184013DA006DCB22 /* quark.cpp */,
