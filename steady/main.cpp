@@ -24,6 +24,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifdef _WIN32
+#define M_PI 3.14159265358979323846
+#endif
+
 
 //	Make a vector of ints. Add a few numbers.
 //	Notice that push_back() returns a new vector each time - you need to save the return value.
