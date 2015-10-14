@@ -358,7 +358,12 @@ void set_runtime(runtime_i* iRuntime);
 
 #if QUARK_ASSERT_ON
 
-	void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
+	#if _MSC_VER
+		void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
+	#else
+		void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]) __dead2;
+	#endif
+
 
 	#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), QUARK_STRING(x)); }
 	#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)
