@@ -250,6 +250,13 @@
 #ifndef quark_h
 #define quark_h
 
+/* SB: needed to ignore warnings for unchecked vectors and deprecated functions such as strcpy() */
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#define _SCL_SECURE_NO_WARNINGS
+#endif
+
+
 
 #include <cassert>
 #include <vector>
@@ -351,7 +358,7 @@ void set_runtime(runtime_i* iRuntime);
 
 #if QUARK_ASSERT_ON
 
-	void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]) __dead2;
+	void on_assert_hook(runtime_i* runtime, const source_code_location& location, const char expression[]);
 
 	#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), QUARK_STRING(x)); }
 	#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)

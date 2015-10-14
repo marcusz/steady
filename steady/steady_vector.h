@@ -46,6 +46,7 @@
 #define STEADY_SCOPED_TRACE(x) QUARK_SCOPED_TRACE(x)
 
 
+
 namespace steady {
 
 	//	#define BRANCHING_FACTOR_SHIFT to get different branching factors.
@@ -759,7 +760,7 @@ template <class T> size_t get_leaf_count();
 		/*
 			This is the central building block: adds many values to a vector (or a create a new vector) fast.
 		*/
-#if false
+#if 0
 		template <class T>
 		vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
 			STEADY_ASSERT(original.check_invariant());
@@ -789,7 +790,7 @@ template <class T> size_t get_leaf_count();
 				size_t last_leaf_size = original.size() & BRANCHING_FACTOR_MASK;
 				if(last_leaf_size > 0){
 					size_t last_leaf_node_index = original.size() & ~(BRANCHING_FACTOR_MASK);
-#if false
+#if 0
 					size_t copy_count = std::min(BRANCHING_FACTOR - last_leaf_size, count);
 					for(size_t i = 0 ; i < copy_count ; i++){
 						result = push_back_1(result, values[source_pos]);
@@ -1312,7 +1313,7 @@ std::size_t vector<T>::size() const{
 }
 
 
-#if false
+#if 0
 
 //	Correct, reference implementation.
 template <class T>
@@ -1362,7 +1363,7 @@ T vector<T>::operator[](const std::size_t index) const{
 #endif
 
 
-#if false
+#if 0
 
 //	Correct but slow reference implementation.
 template <class T>

@@ -19,7 +19,7 @@
 #include "steady_vector.h"
 
 #include <algorithm>
-
+#include <memory>
 
 //	Make shortcuts macros shorter names
 #define ASSERT(x) STEADY_ASSERT(x)
@@ -197,6 +197,7 @@ QUARK_UNIT_TEST("", "test_fixture()", "no nodes", "no assert"){
 	VERIFY(test._leaf_expected_count == 0);
 }
 
+#ifndef _MSC_VER	// SB: No initializer-list constructor defined for inode: a.reset(new idnode<int>({})); Does not compile in VS.
 QUARK_UNIT_TEST("", "test_fixture()", "1 inode, 2 leaf nodes", "correct state (and no assert!)"){
 	test_fixture<int> test;
 
@@ -216,7 +217,7 @@ QUARK_UNIT_TEST("", "test_fixture()", "1 inode, 2 leaf nodes", "correct state (a
 		VERIFY(test._leaf_expected_count == 2);
 	}
 }
-
+#endif
 
 /*
 	Generates a ramp from _start_ incrementing by +1. _count_ items.
@@ -756,13 +757,14 @@ QUARK_UNIT_TEST("vector", "vector(const std::vector<T>& vec)", "7 values", "read
 
 ////////////////////////////////////////////		vector::vector(const T values[], size_t count)
 
-
+#ifndef _MSC_VER /* SB: Visual studio does not allow 0-length arrays */
 QUARK_UNIT_TEST("vector", "vector(const T values[], size_t count)", "0 values", "empty"){
 	test_fixture<int> f;
 	const int a[] = {};
 	vector<int> v(&a[0], 0);
 	VERIFY(v.size() == 0);
 }
+#endif
 
 QUARK_UNIT_TEST("vector", "vector(const T values[], size_t count)", "7 values", "read back all"){
 	test_fixture<int> f;
