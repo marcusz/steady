@@ -33,42 +33,6 @@
 
 namespace steady {
 
-namespace internals {
-
-	size_t divide_round_up(size_t value, size_t align){
-		auto r = value / align;
-		return r * align < value ? r + 1 : r;
-	}
-
-	int count_to_depth(size_t count){
-		const auto leaf_count = divide_round_up(count, BRANCHING_FACTOR);
-
-		if(leaf_count == 0){
-			return 0;
-		}
-		else if(leaf_count == 1){
-			return 1;
-		}
-		else {
-			return 1 + count_to_depth(leaf_count);
-		}
-	}
-	
-	size_t shift_to_max_size(int shift){
-		size_t size = BRANCHING_FACTOR << shift;
-		return size;
-	}
-
-
-	int vector_size_to_shift(size_t size){
-		int shift = (count_to_depth(size) - 1) * BRANCHING_FACTOR_SHIFT;
-		return shift;
-	}
-
-}
-
-
-
 using namespace internals;
 
 

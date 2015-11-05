@@ -26,25 +26,43 @@
 	Can hold 0 to UINT32_MAX values.
 */
 
-
 #ifndef __steady__vector__
 #define __steady__vector__
+#pragma once
 
-#include "quark.h"
 #include <initializer_list>
 #include <atomic>
 #include <vector>
 #include <array>
 
-#define STEADY_ASSERT_ON QUARK_ASSERT_ON
 
-#define STEADY_ASSERT(x) QUARK_ASSERT(x)
-#define STEADY_ASSERT_UNREACHABLE QUARK_ASSERT_UNREACHABLE
-#define STEADY_TRACE(x) QUARK_TRACE(x)
-#define STEADY_TRACE_SS(x) QUARK_TRACE_SS(x)
-#define STEADY_TEST_VERIFY(x) QUARK_TEST_VERIFY(x)
-#define STEADY_SCOPED_TRACE(x) QUARK_SCOPED_TRACE(x)
+#ifndef STEADY_ASSERT_ON // ### Rename to STEADY_DEBUG ?
+	#ifdef _DEBUG
+		#define STEADY_ASSERT_ON _DEBUG // ### Is there a better portable debug definition?
+	#else
+		#define STEADY_ASSERT_ON 0
+#endif
+#endif
 
+#ifndef STEADY_ASSERT
+	#define STEADY_ASSERT(x)
+#endif
+
+#ifndef STEADY_ASSERT_UNREACHABLE
+	#define STEADY_ASSERT_UNREACHABLE
+#endif
+
+#ifndef STEADY_TRACE
+	#define STEADY_TRACE(x)
+#endif
+
+#ifndef STEADY_TRACE_SS
+	#define STEADY_TRACE_SS(x)
+#endif
+
+#ifndef STEADY_SCOPED_TRACE
+	#define STEADY_SCOPED_TRACE(x)
+#endif
 
 
 namespace steady {
@@ -83,8 +101,14 @@ namespace steady {
 
 		////////////////////////////////////////////		Utility functions
 
-		size_t divide_round_up(size_t value, size_t align);
 
+		/*
+			### To be documented.
+		*/
+		inline size_t divide_round_up(size_t value, size_t align){
+			const auto r = value / align;
+			return r * align < value ? r + 1 : r;
+		}
 
 		/*
 			Returns how deep node hiearchy is for a tree with *count* values. Counts both leaf-nodes and inodes.
@@ -93,13 +117,27 @@ namespace steady {
 			2: one inode with 1-4 leaf nodes.
 			3: two levels of inodes plus leaf nodes.
 		*/
-		inline int count_to_depth(size_t count);
+		inline int count_to_depth(size_t count){
+			const auto leaf_count = divide_round_up(count, BRANCHING_FACTOR);
+
+			if(leaf_count == 0){
+				return 0;
+			}
+			else if(leaf_count == 1){
+				return 1;
+			}
+			else {
+				return 1 + count_to_depth(leaf_count);
+			}
+		}
 
 		/*
 			Given a shift value, how many values can this tree hold without introduce more levels of inodes?
 		*/
-		size_t shift_to_max_size(int shift);
-
+		inline size_t shift_to_max_size(int shift){
+			const size_t size = BRANCHING_FACTOR << shift;
+			return size;
+		}
 
 		/*
 			Return how many steps to shift vector-index to get its *top-level* bits.
@@ -109,7 +147,10 @@ namespace steady {
 			BRANCHING_FACTOR_SHIFT: inode1 (inode that points to leafnodes)
 			>=BRANCHING_FACTOR_SHIFT: inode that points to inodes.
 		*/
-		int vector_size_to_shift(size_t size);
+		inline int vector_size_to_shift(size_t size){
+			const int shift = (count_to_depth(size) - 1) * BRANCHING_FACTOR_SHIFT;
+			return shift;
+		}
 
 
 
@@ -255,8 +296,8 @@ namespace steady {
 			public: const leaf_node<T>* get_child_as_leaf_node(size_t index) const{
 				STEADY_ASSERT(check_invariant());
 				STEADY_ASSERT(index < _children.size());
-
 				STEADY_ASSERT(_children[0].get_type() == node_type::leaf_node);
+
 				return _children[index]._leaf_node;
 			}
 
@@ -316,6 +357,9 @@ namespace steady {
 
 template <class T>
 class vector {
+	public: typedef T value_type;
+	public: typedef std::size_t size_type;
+
 	public: vector();
 	public: vector(const std::vector<T>& values);
 	public: vector(const T values[], size_t count);
@@ -328,7 +372,9 @@ class vector {
 	public: vector& operator=(const vector& rhs);
 	public: void swap(vector& rhs);
 	public: vector store(size_t index, const T& value) const;
+	public: vector store(size_t index, T&& value) const;
 	public: vector push_back(const T& value) const;
+	public: vector push_back(T&& value) const;
 	public: vector push_back(const std::vector<T>& values) const;
 	public: vector push_back(const T values[], size_t count) const;
 
@@ -345,7 +391,7 @@ class vector {
 		return size() == 0;
 	}
 
-	public: T operator[](std::size_t index) const;
+	public: const T& operator[](std::size_t index) const;
 
 	public: std::vector<T> to_vec() const;
 
@@ -453,12 +499,12 @@ template <class T> size_t get_leaf_count();
 			if(vec.size() > 0){
 				const auto type = vec[0].get_type();
 				if(type == node_type::null_node){
-					for(auto i: vec){
+					for(const auto& i: vec){
 						STEADY_ASSERT(i.get_type() == node_type::null_node);
 					}
 				}
 				else if(type == node_type::inode){
-					int i = 0;
+					size_t i = 0;
 					while(i < vec.size() && vec[i].get_type() == node_type::inode){
 						i++;
 					}
@@ -468,7 +514,7 @@ template <class T> size_t get_leaf_count();
 					}
 				}
 				else if(type == node_type::leaf_node){
-					int i = 0;
+					size_t i = 0;
 					while(i < vec.size() && vec[i].get_type() == node_type::leaf_node){
 						i++;
 					}
@@ -490,10 +536,15 @@ template <class T> size_t get_leaf_count();
 			return node_ref<T>(new leaf_node<T>(values));
 		}
 
+		template <class T>
+		node_ref<T> make_leaf_node(T&& first_value){
+			auto leafnode = new leaf_node<T>();
+			leafnode->_values[0] = std::move(first_value);
+			return node_ref<T>(leafnode);
+		}
 
 		template <class T>
 		node_ref<T> make_inode_from_vector(const std::vector<node_ref<T>>& children){
-			STEADY_ASSERT(children.size() >= 0);
 			STEADY_ASSERT(children.size() <= BRANCHING_FACTOR);
 
 			std::array<node_ref<T>, BRANCHING_FACTOR> temp{};
@@ -593,6 +644,7 @@ template <class T> size_t get_leaf_count();
 			result: copy of "tree" that has "value" stored. Same size as original.
 				result-tree and original tree shares internal state.
 		*/
+
 		template <class T>
 		node_ref<T> replace_value(const node_ref<T>& node, int shift, size_t index, const T& value){
 			STEADY_ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
@@ -620,7 +672,35 @@ template <class T> size_t get_leaf_count();
 				return copy;
 			}
 		}
+		template <class T>
+		node_ref<T> replace_value(const node_ref<T>& node, int shift, size_t index, T&& value){
+			STEADY_ASSERT(node.get_type() == node_type::inode || node.get_type() == node_type::leaf_node);
 
+			const size_t slot_index = (index >> shift) & BRANCHING_FACTOR_MASK;
+			if(shift == LEAF_NODE_SHIFT){
+				STEADY_ASSERT(node.get_type() == node_type::leaf_node);
+
+				auto copy = node_ref<T>(new leaf_node<T>(node.get_leaf_node()->_values));
+
+				STEADY_ASSERT(slot_index < copy.get_leaf_node()->_values.size());
+				copy.get_leaf_node()->_values[slot_index] = std::move(value);
+
+				return copy;
+			}
+			else{
+				STEADY_ASSERT(node.get_type() == node_type::inode);
+
+				const auto child = node.get_inode()->get_child(slot_index);
+				auto child2 = replace_value(child, shift - BRANCHING_FACTOR_SHIFT, index, std::move(value));
+
+				auto children = node.get_inode()->get_child_array();
+				children[slot_index] = child2;
+				auto copy = make_inode_from_array(children);
+				return copy;
+			}
+		}
+
+		
 		/*
 			Creates a leaf node with zero to many parent inodes (all inodes only contain one item).
 
@@ -738,24 +818,39 @@ template <class T> size_t get_leaf_count();
 		}
 
 
+
+
 		template <class T>
-		vector<T> push_back_1(const vector<T>& original, const T& value){
+		vector<T> push_back_1(const vector<T>& original, const T& value) {
 			STEADY_ASSERT(original.check_invariant());
-
 			const auto size = original.size();
-
 			//	Does last leaf node have space for one more value? Then we use replace_value() - keeping tree same size.
 			if((size & BRANCHING_FACTOR_MASK) != 0){
 				const auto shift = original.get_shift();
 				const auto root = replace_value(original.get_root(), shift, size, value);
 				return vector<T>(root, size + 1, shift);
 			}
-			else{
+			else {
 				const auto leaf = make_leaf_node<T>({ value });
 				return push_back_leaf_node(original, leaf, 1);
 			}
 		}
 
+		template <class T>
+		vector<T> push_back_1(const vector<T>& original, T&& value) {
+			STEADY_ASSERT(original.check_invariant());
+			const auto size = original.size();
+			//	Does last leaf node have space for one more value? Then we use replace_value() - keeping tree same size.
+			if((size & BRANCHING_FACTOR_MASK) != 0) {
+				const auto shift = original.get_shift();
+				const auto root = replace_value(original.get_root(), shift, size, std::forward<T>(value));
+				return vector<T>(root, size + 1, shift);
+			}
+			else {
+				const auto leaf = make_leaf_node<T>(std::move( value ));
+				return push_back_leaf_node(original, leaf, 1);
+			}
+		}
 
 		/*
 			This is the central building block: adds many values to a vector (or a create a new vector) fast.
@@ -776,7 +871,7 @@ template <class T> size_t get_leaf_count();
 #else
 
 		template <class T>
-		vector<T> push_back_batch(const vector<T>& original, const T values[], size_t count){
+		vector<T> push_back_batch(const vector<T>& original, const T values[], std::size_t count){
 			STEADY_ASSERT(original.check_invariant());
 			STEADY_ASSERT(values != nullptr);
 
@@ -826,8 +921,8 @@ template <class T> size_t get_leaf_count();
 				while(source_pos < count){
 					STEADY_ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
 
-					auto new_leaf_node = node_ref<T>(new leaf_node<T>());
-					size_t batch_count = std::min(count - source_pos, static_cast<size_t>(BRANCHING_FACTOR));
+					const auto new_leaf_node = node_ref<T>(new leaf_node<T>());
+					const size_t batch_count = std::min(count - source_pos, static_cast<std::size_t>(BRANCHING_FACTOR));
 
 					std::copy(&values[source_pos],
 						&values[source_pos + batch_count],
@@ -1056,7 +1151,7 @@ template <class T>
 vector<T>::vector(const std::vector<T>& values){
 	//	!!! Illegal to take adress of first element of vec if it's empty.
 	if(!values.empty()){
-		auto temp = internals::push_back_batch(vector<T>(), &values[0], values.size());
+		auto temp = internals::push_back_batch(vector<T>(), values.data(), values.size());
 		temp.swap(*this);
 	}
 
@@ -1089,8 +1184,9 @@ vector<T>::vector(std::initializer_list<T> args){
 template <class T>
 vector<T>::~vector(){
 	STEADY_ASSERT(check_invariant());
-
+#if STEADY_ASSERT_ON
 	_size = -1;
+#endif
 }
 
 
@@ -1177,7 +1273,7 @@ template <class T>
 size_t vector<T>::get_block_count() const{
 	STEADY_ASSERT(check_invariant());
 
-	size_t count = internals::divide_round_up(_size, BRANCHING_FACTOR);
+	const size_t count = internals::divide_round_up(_size, BRANCHING_FACTOR);
 	return count;
 }
 
@@ -1196,30 +1292,39 @@ const T* vector<T>::get_block(size_t block_index) const{
 template <class T>
 vector<T> vector<T>::push_back(const T& value) const{
 	STEADY_ASSERT(check_invariant());
-
 	return internals::push_back_1(*this, value);
 }
+template <class T>
+vector<T> vector<T>::push_back(T&& value) const {
+	STEADY_ASSERT(check_invariant());
+	return internals::push_back_1(*this, std::forward<T>(value));
+}
+
+
 
 
 template <class T>
 vector<T> vector<T>::push_back(const std::vector<T>& values) const{
 	STEADY_ASSERT(check_invariant());
-
 	if(values.size() > 0){
-		return internals::push_back_batch(*this, &values[0], values.size());
+		return internals::push_back_batch(*this, values.data(), values.size());
 	}
-	else{
+	else {
 		return *this;
 	}
 }
 
 template <class T>
-vector<T> vector<T>::push_back(const T values[], size_t count) const{
+vector<T> vector<T>::push_back(const T values[], size_t count) const {
 	STEADY_ASSERT(check_invariant());
 	STEADY_ASSERT(values != nullptr);
 
 	return internals::push_back_batch(*this, values, count);
 }
+
+
+
+
 
 
 /*
@@ -1276,13 +1381,13 @@ bool vector<T>::operator==(const vector& rhs) const{
 	//	First check node to see if they are the same pointer. If not, only then compare their values.
 
 	{
-		size_t block_count = get_block_count();
+		const size_t block_count = get_block_count();
 		for(size_t index = 0 ; index < block_count ; index++){
 			const T* valuesA = get_block(index);
 			const T* valuesB = rhs.get_block(index);
 
-			size_t r = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
-			bool equal = std::equal(valuesA, valuesA + r, valuesB);
+			const size_t r = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
+			const bool equal = std::equal(valuesA, valuesA + r, valuesB);
 			if(!equal){
 				return false;
 			}
@@ -1299,8 +1404,16 @@ template <class T>
 vector<T> vector<T>::store(size_t index, const T& value) const{
 	STEADY_ASSERT(check_invariant());
 	STEADY_ASSERT(index < _size);
-
 	const auto root = replace_value(_root, _shift, index, value);
+	return vector<T>(root, _size, _shift);
+}
+
+
+template <class T>
+vector<T> vector<T>::store(size_t index, T&& value) const{
+	STEADY_ASSERT(check_invariant());
+	STEADY_ASSERT(index < _size);
+	const auto root = replace_value(_root, _shift, index, std::forward<T>(value));
 	return vector<T>(root, _size, _shift);
 }
 
@@ -1308,7 +1421,6 @@ vector<T> vector<T>::store(size_t index, const T& value) const{
 template <class T>
 std::size_t vector<T>::size() const{
 	STEADY_ASSERT(check_invariant());
-
 	return _size;
 }
 
@@ -1336,7 +1448,7 @@ Speed-optimized implementation of operator[].
 Avoids updating reference counters, avoids function calls etc.
 */
 template <class T>
-T vector<T>::operator[](const std::size_t index) const{
+const T& vector<T>::operator[](const std::size_t index) const{
 	STEADY_ASSERT(check_invariant());
 	STEADY_ASSERT(index < _size);
 
@@ -1345,7 +1457,7 @@ T vector<T>::operator[](const std::size_t index) const{
 
 	//	Traverse all inodes.
 	while(shift > 0){
-		size_t slot_index = (index >> shift) & internals::BRANCHING_FACTOR_MASK;
+		const size_t slot_index = (index >> shift) & internals::BRANCHING_FACTOR_MASK;
 		node_it = &node_it->_inode->_children[slot_index];
 		shift -= BRANCHING_FACTOR_SHIFT;
 	}
@@ -1356,8 +1468,8 @@ T vector<T>::operator[](const std::size_t index) const{
 	const auto slot_index = index & internals::BRANCHING_FACTOR_MASK;
 
 	STEADY_ASSERT(slot_index < node_it->get_leaf_node()->_values.size());
-	const T* result = &node_it->_leaf_node->_values[slot_index];
-	return *result;
+	const auto& result = node_it->_leaf_node->_values[slot_index];
+	return result;
 }
 
 #endif
@@ -1391,11 +1503,11 @@ std::vector<T> vector<T>::to_vec() const{
 	result.reserve(size());
 
 	//	Block-wise copy.
-	size_t block_count = get_block_count();
+	const auto block_count = get_block_count();
 	for(size_t index = 0 ; index < block_count ; index++){
-		const T* valuesA = get_block(index);
+		const T* values_a = get_block(index);
 		const auto size = std::min(static_cast<size_t>(BRANCHING_FACTOR), _size - index * BRANCHING_FACTOR);
-		result.insert(result.end(), valuesA, valuesA + size);
+		result.insert(result.end(), values_a, values_a + size);
 	}
 	return result;
 }
