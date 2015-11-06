@@ -247,7 +247,6 @@ void default_runtime::runtime_i__on_unit_test_failed(const source_code_location&
 */
 void test_macros(){
 	QUARK_ASSERT(true);
-	QUARK_ASSERT_UNREACHABLE;
 
 	QUARK_TRACE("hello");
 	QUARK_TRACE_SS("hello" << 1234);

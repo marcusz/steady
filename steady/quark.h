@@ -34,7 +34,6 @@
 	Quark is designed to be a policy rather than actual code. These are the primitives that makes up that policy:
 
 		QUARK_ASSERT(x)
-		QUARK_ASSERT_UNREACHABLE
 
 		QUARK_TRACE(x)
 		QUARK_TRACE_SS(x)
@@ -69,11 +68,6 @@
 	When expression x evaluates to false, there is a defect in the code. Compiled-out if QUARK_ASSERT_ON is false.
 
 
-	QUARK_ASSERT_UNREACHABLE;
-	Use this to tag places in the code that should never execute, like the "default:" in a switch statement.
-	Compiled-out if QUARK_ASSERT_ON is false.
-
-
 	Examples 1 - check function arguments:
 
 		char* my_strlen(const char* s){
@@ -89,7 +83,8 @@
 		else if (a == 3){
 		}
 		else {
-			QUARK_ASSERT_UNREACHABLE;
+			QUARK_ASSERT(false);
+			throw std::logic_error("");	//	Remove missing-return value warning, if any.
 		}
 
 
@@ -177,7 +172,6 @@
 
 
 		MY_LIBRARY_ASSERT(x)
-		MY_LIBRARY_ASSERT_UNREACHABLE
 
 		MY_LIBRARY_TRACE(x)
 		MY_LIBRARY_TRACE_SS(x)
@@ -188,7 +182,6 @@
 
 
 		TETRIS_CLONE_ASSERT(x)
-		TETRIS_CLONE_ASSERT_UNREACHABLE
 
 		TETRIS_CLONE_TRACE(x)
 		TETRIS_CLONE_TRACE_SS(x)
@@ -366,12 +359,10 @@ void set_runtime(runtime_i* iRuntime);
 
 
 	#define QUARK_ASSERT(x) if(x){}else {::quark::on_assert_hook(::quark::get_runtime(), quark::source_code_location(__FILE__, __LINE__), QUARK_STRING(x)); }
-	#define QUARK_ASSERT_UNREACHABLE QUARK_ASSERT(false)
 
 #else
 
 	#define QUARK_ASSERT(x)
-	#define QUARK_ASSERT_UNREACHABLE throw std::logic_error("")
 
 #endif
 

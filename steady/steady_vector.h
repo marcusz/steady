@@ -14,55 +14,30 @@
 	limitations under the License.
 
 	steady::vector<> is a persistent vector class for C++
-
-
-
-	DETAILS
-	====================================================================================================================
-	NOTICE: if T has member functions that throws exception, so will vector.
-
-	NOTICE: Some member functions, like pop_back() and operator+(), have naive implementation that are slow right now.
-
-	Can hold 0 to UINT32_MAX values.
 */
 
+#pragma once
 #ifndef __steady__vector__
 #define __steady__vector__
-#pragma once
 
+#include "quark.h"
 #include <initializer_list>
 #include <atomic>
 #include <vector>
 #include <array>
+#include <sstream>
 
+/*
+	### Find practical way to remove dependency to quark.h, that doesn't require client to define
+	STEADY_TRACE_SS() etc from scratch.
+*/
+#define STEADY_ASSERT_ON QUARK_ASSERT_ON
 
-#ifndef STEADY_ASSERT_ON // ### Rename to STEADY_DEBUG ?
-	#ifdef _DEBUG
-		#define STEADY_ASSERT_ON _DEBUG // ### Is there a better portable debug definition?
-	#else
-		#define STEADY_ASSERT_ON 0
-#endif
-#endif
-
-#ifndef STEADY_ASSERT
-	#define STEADY_ASSERT(x)
-#endif
-
-#ifndef STEADY_ASSERT_UNREACHABLE
-	#define STEADY_ASSERT_UNREACHABLE
-#endif
-
-#ifndef STEADY_TRACE
-	#define STEADY_TRACE(x)
-#endif
-
-#ifndef STEADY_TRACE_SS
-	#define STEADY_TRACE_SS(x)
-#endif
-
-#ifndef STEADY_SCOPED_TRACE
-	#define STEADY_SCOPED_TRACE(x)
-#endif
+#define STEADY_ASSERT(x) QUARK_ASSERT(x)
+#define STEADY_TRACE(x) QUARK_TRACE(x)
+#define STEADY_TRACE_SS(x) QUARK_TRACE_SS(x)
+#define STEADY_TEST_VERIFY(x) QUARK_TEST_VERIFY(x)
+#define STEADY_SCOPED_TRACE(x) QUARK_SCOPED_TRACE(x)
 
 
 namespace steady {
@@ -478,7 +453,7 @@ template <class T> size_t get_leaf_count();
 				}
 			}
 			else{
-				STEADY_ASSERT_UNREACHABLE;
+				STEADY_ASSERT(false);
 			}
 		}
 
@@ -921,7 +896,7 @@ template <class T> size_t get_leaf_count();
 				while(source_pos < count){
 					STEADY_ASSERT((result.size() & BRANCHING_FACTOR_MASK) == 0);
 
-					const auto new_leaf_node = node_ref<T>(new leaf_node<T>());
+					auto new_leaf_node = node_ref<T>(new leaf_node<T>());
 					const size_t batch_count = std::min(count - source_pos, static_cast<std::size_t>(BRANCHING_FACTOR));
 
 					std::copy(&values[source_pos],
@@ -1104,7 +1079,8 @@ template <class T> size_t get_leaf_count();
 				return node_type::leaf_node;
 			}
 			else{
-				STEADY_ASSERT_UNREACHABLE;
+				STEADY_ASSERT(false);
+				throw nullptr;//	Dummy to stop warning.
 			}
 		}
 
@@ -1307,7 +1283,7 @@ template <class T>
 vector<T> vector<T>::push_back(const std::vector<T>& values) const{
 	STEADY_ASSERT(check_invariant());
 	if(values.size() > 0){
-		return internals::push_back_batch(*this, values.data(), values.size());
+		return internals::push_back_batch<T>(*this, values.data(), values.size());
 	}
 	else {
 		return *this;
