@@ -180,7 +180,7 @@ image make_image(int width, int height){
 	for(auto y = 0 ; y < height ; y++){
 		line.clear();
 		for(auto x = 0 ; x < width ; x++){
-			float s = std::sin(M_PI * 2.0f * (float)x);
+			float s = std::sin(static_cast<float>(M_PI) * 2.0f * (float)x);
 			pixel p(0.5f + s, 0.5f, 0.0f, 1.0f);
 			line.push_back(p);
 		}
@@ -198,7 +198,7 @@ image make_image(int width, int height){
 //	There is no way to trip-up caller because image is a copy.
 image worker8(image img) {
 	const size_t count = std::min<size_t>(300, img._pixels.size());
-	for(int i = 0 ; i < count ; i++){
+	for(size_t i = 0 ; i < count ; i++){
 		auto pixel = img._pixels[i];
 		pixel._red = 1.0f - pixel._red;
 		img._pixels = img._pixels.store(i, pixel);
@@ -310,5 +310,5 @@ int main(int argc, const char * argv[]){
 		return -1;
 	}
 
-    return 0;
+  return 0;
 }
