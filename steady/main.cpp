@@ -23,6 +23,8 @@
 #include <future>
 #include <cmath>
 #include <algorithm>
+#include <cassert>
+#include "quark.h"
 
 #ifdef _WIN32
 #define M_PI 3.14159265358979323846
