@@ -486,7 +486,7 @@ void set_runtime(runtime_i* iRuntime);
 		Stores all unit tests registered for the entire executable.
 	*/
 	struct unit_test_registry {
-		public: std::vector<const unit_test_def> _tests;
+		public: std::vector<unit_test_def> _tests;
 	};
 
 
