@@ -26,6 +26,10 @@ NEXT
 
 SOMEDAY
 --------------------------------------------------------------------------------------------------------------------
+Use catch - for unit tests?
+
+Tests exceptions. REQUIRE_THROWS_AS()
+
 Compile on other compilers. Cloud services?
 
 Use dev-branch

@@ -20,14 +20,15 @@
 
 #include <algorithm>
 #include <memory>
+#include "quark.h"
 
-//	Make shortcuts macros shorter names
+
+//	Make local shortcut macros - shorter names
 #define ASSERT(x) STEADY_ASSERT(x)
 #define TRACE(x) STEADY_TRACE(x)
 #define TRACE_SS(x) STEADY_TRACE_SS(x)
 #define VERIFY(x) STEADY_TEST_VERIFY(x)
 #define SCOPED_TRACE(x) STEADY_SCOPED_TRACE(x)
-#define ASSERT_UNREACHABLE STEADY_ASSERT_UNREACHABLE
 
 
 
@@ -289,8 +290,8 @@ QUARK_UNIT_TEST("", "make_manual_vector2()", "", "correct nodes"){
 */
 vector<int> make_manual_vector_branchfactor_plus_1(){
 	test_fixture<int> f(1, 2);
-	node_ref<int> leaf0 = make_leaf_node(generate_leaves(7, BRANCHING_FACTOR));
-	node_ref<int> leaf1 = make_leaf_node(generate_leaves(7 + BRANCHING_FACTOR, 1));
+	node_ref<int> leaf0 = make_leaf_node<int>(generate_leaves(7, BRANCHING_FACTOR));
+	node_ref<int> leaf1 = make_leaf_node<int>(generate_leaves(7 + BRANCHING_FACTOR, 1));
 	std::vector<node_ref<int>> leafs = { leaf0, leaf1 };
 	node_ref<int> inode = make_inode_from_vector(leafs);
 	return vector<int>(inode, BRANCHING_FACTOR + 1, vector_size_to_shift(BRANCHING_FACTOR + 1));
@@ -343,11 +344,11 @@ vector<int> make_manual_vector_branchfactor_square_plus_1(){
 
 	std::vector<node_ref<int>> leaves;
 	for(int i = 0 ; i < BRANCHING_FACTOR ; i++){
-		node_ref<int> leaf = make_leaf_node(generate_leaves(1000 + BRANCHING_FACTOR * i, BRANCHING_FACTOR));
+		node_ref<int> leaf = make_leaf_node<int>(generate_leaves(1000 + BRANCHING_FACTOR * i, BRANCHING_FACTOR));
 		leaves.push_back(leaf);
 	}
 
-	node_ref<int> extraLeaf = make_leaf_node(generate_leaves(1000 + BRANCHING_FACTOR * BRANCHING_FACTOR + 0, 1));
+	node_ref<int> extraLeaf = make_leaf_node<int>(generate_leaves(1000 + BRANCHING_FACTOR * BRANCHING_FACTOR + 0, 1));
 
 	node_ref<int> inodeA = make_inode_from_vector<int>(leaves);
 	node_ref<int> inodeB = make_inode_from_vector<int>({ extraLeaf });
